@@ -1,3 +1,5 @@
+import { startTargetRound, hitTarget, targetOutcome } from '../games/mini/target-round.js';
+import { isMiniType, defaultMiniConfig, drawMini, validateMiniConfig, type MiniConfig } from "../games/mini/mini-engine.js";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import type { MongoClient, Db, ClientSession, Filter } from "mongodb";
@@ -231,6 +233,7 @@ export class LiveOpsService extends EventEmitter {
   async createCampaign(
     input: Omit<Campaign, "_id" | "createdAt" | "updatedAt">,
   ) {
+    if (input.gameConfig && isMiniType(input.rewardType)) validateMiniConfig(input.rewardType, input.gameConfig);
     const campaign: Campaign = {
       _id: randomUUID(),
       ...input,
@@ -244,6 +247,7 @@ export class LiveOpsService extends EventEmitter {
     campaignId: string,
     input: Omit<Campaign, "_id" | "createdAt" | "updatedAt">,
   ) {
+    if (input.gameConfig && isMiniType(input.rewardType)) validateMiniConfig(input.rewardType, input.gameConfig);
     const c = await this.c.campaigns.findOneAndUpdate(
       { _id: campaignId },
       { $set: { ...input, updatedAt: new Date() } },
@@ -257,6 +261,7 @@ export class LiveOpsService extends EventEmitter {
     input: {
       playerId: string;
       type: Award["type"];
+      gameConfig?: MiniConfig;
       value: number;
       requestId: string;
     },
@@ -305,12 +310,16 @@ export class LiveOpsService extends EventEmitter {
           ...input,
           type: campaign.rewardType,
           value: campaign.rewardValue,
+          gameConfig: campaign.gameConfig,
         };
       }
+      const gameConfig = isMiniType(input.type)
+        ? validateMiniConfig(input.type, input.gameConfig ?? defaultMiniConfig(input.type)) : undefined;
       const record: Award = {
         _id: randomUUID(),
         ...input,
         campaignId,
+        ...(gameConfig ? { gameConfig } : {}),
         status: input.type === "credits" ? "credited" : "pending",
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -325,6 +334,7 @@ export class LiveOpsService extends EventEmitter {
       return record;
     });
     this.emit("player", input.playerId);
+    this.emit("awards", input.playerId);
     return award;
   }
   async issueCampaign(campaignId: string) {
@@ -361,6 +371,7 @@ export class LiveOpsService extends EventEmitter {
             playerId: p._id,
             type: campaign.rewardType,
             value: campaign.rewardValue,
+          gameConfig: campaign.gameConfig,
             requestId: `campaign:${campaignId}:${p._id}`,
           },
           campaignId,
@@ -378,7 +389,7 @@ export class LiveOpsService extends EventEmitter {
   }
   async revoke(awardId: string) {
     const award = await this.c.awards.findOneAndUpdate(
-      { _id: awardId, status: "pending" },
+      { _id: awardId, status: "pending", targetRound: { $exists: false } },
       { $set: { status: "revoked", updatedAt: new Date() } },
       { returnDocument: "after" },
     );
@@ -386,9 +397,81 @@ export class LiveOpsService extends EventEmitter {
       throw new DomainError(
         409,
         "AWARD_NOT_PENDING",
-        "Only pending mini-game awards can be revoked. Credited awards are retained as ledger records.",
+        "Only pending mini-game awards that have not started can be revoked. Credited awards are retained as ledger records.",
       );
+    this.emit("awards", award.playerId);
     return award;
+  }
+  async pendingAwards(playerId: string) {
+    return this.c.awards.find({ playerId, status: 'pending', type: { $in: ['wheel', 'chests', 'targets', 'scratch'] } }).sort({ createdAt: 1, _id: 1 }).toArray();
+  }
+  async getAward(playerId: string, awardId: string) {
+    const award = await this.c.awards.findOne({ _id: awardId, playerId });
+    if (!award) throw new DomainError(404, 'AWARD_NOT_FOUND', 'Award not found for this player.');
+    if (!isMiniType(award.type)) throw new DomainError(400, 'UNSUPPORTED_GAME', 'This award is not a mini-game.');
+    if (award.type === 'targets' && award.status === 'pending' && award.targetRound && award.targetRound.endsAt <= Date.now()) {
+      const finished = await this.targetAction(playerId, awardId, 'finish');
+      return {...finished, gameConfig: finished.gameConfig ?? defaultMiniConfig('targets')};
+    }
+    return { ...award, gameConfig: award.gameConfig ?? defaultMiniConfig(award.type) };
+  }
+  async playAward(playerId: string, awardId: string, choiceIndex?: number) {
+    const award = await this.transaction(async (session) => {
+      const stored = await this.c.awards.findOne({ _id: awardId, playerId }, { session });
+      if (!stored) throw new DomainError(404, 'AWARD_NOT_FOUND', 'Award not found for this player.');
+      const player = await this.getPlayer(playerId, session); this.active(player);
+      if (stored.status === 'played') return stored;
+      if (stored.status !== 'pending') throw new DomainError(409, 'AWARD_UNAVAILABLE', 'This award is no longer available.');
+      if (!isMiniType(stored.type)) throw new DomainError(400, 'UNSUPPORTED_GAME', 'This mini-game is not available yet.');
+      if (stored.type === 'targets') throw new DomainError(400, 'TIMED_ROUND_REQUIRED', 'Start the timed target round to play this award.');
+      const config = stored.gameConfig ?? defaultMiniConfig(stored.type);
+      let outcome;
+      try { outcome = drawMini(stored.type, config, choiceIndex); }
+      catch (error) { throw new DomainError(400, 'INVALID_CHOICE', error instanceof Error ? error.message : 'Invalid game choice.'); }
+      const now = new Date();
+      await this.c.players.updateOne({ _id: playerId }, { $inc: { balance: outcome.payout } }, { session });
+      const updated = await this.c.awards.findOneAndUpdate({ _id: awardId, playerId, status: 'pending' }, { $set: { status: 'played', gameConfig: config, outcome, playedAt: now, updatedAt: now } }, { session, returnDocument: 'after' });
+      if (!updated) throw new DomainError(409, 'AWARD_UNAVAILABLE', 'Award already processed.');
+      return updated;
+    });
+    this.emit('player', playerId);
+    this.emit('awards', playerId);
+    return award;
+  }
+  async targetAction(playerId: string, awardId: string, action: 'start' | 'hit' | 'finish', targetId?: string) {
+    const award = await this.transaction(async (session) => {
+      const stored = await this.c.awards.findOne({ _id: awardId, playerId }, { session });
+      if (!stored || stored.type !== 'targets') throw new DomainError(404, 'AWARD_NOT_FOUND', 'Target award not found for this player.');
+      if (stored.status === 'played') return stored;
+      if (stored.status !== 'pending') throw new DomainError(409, 'AWARD_UNAVAILABLE', 'This award is no longer available.');
+      // A running round must still settle if the player is archived during it.
+      if (!stored.targetRound) this.active(await this.getPlayer(playerId, session));
+      const config = stored.gameConfig ?? defaultMiniConfig('targets');
+      let round = stored.targetRound;
+      const now = Date.now();
+      if (!round) {
+        if (action !== 'start') throw new DomainError(400, 'ROUND_NOT_STARTED', 'Start the round first.');
+        round = startTargetRound(config, now);
+      } else if (action === 'hit' && now < round.endsAt) {
+        try { round = hitTarget(round, config, targetId!, now); }
+        catch { throw new DomainError(400, 'INVALID_TARGET', 'This target is not active.'); }
+      }
+      const ended = now >= round.endsAt;
+      const outcome = ended ? targetOutcome(round, config) : undefined;
+      if (outcome) await this.c.players.updateOne({ _id: playerId }, { $inc: {balance: outcome.payout} }, { session });
+      const updated = await this.c.awards.findOneAndUpdate({ _id: awardId, status: 'pending' }, {
+        $set: { targetRound: round, gameConfig: config, updatedAt: new Date(now),
+          ...(outcome ? { status: 'played' as const, outcome, playedAt: new Date(now) } : {}) }
+      }, { session, returnDocument: 'after' });
+      if (!updated) throw new DomainError(409, 'AWARD_UNAVAILABLE', 'Award already processed.');
+      return updated;
+    });
+    if (award.status === 'played') { this.emit('player', playerId); this.emit('awards', playerId); }
+    return award;
+  }
+  async settleExpiredTargets() {
+    const expired = await this.c.awards.find({type:'targets',status:'pending','targetRound.endsAt':{$lte:Date.now()}}).limit(100).toArray();
+    for (const award of expired) await this.targetAction(award.playerId,award._id,'finish');
   }
   async simulateSession(playerId: string, daysAgo: number) {
     const date = new Date();
@@ -522,6 +605,8 @@ export class LiveOpsService extends EventEmitter {
         total: awards.length,
         pending: awards.filter((a) => a.status === "pending").length,
         credited: awards.filter((a) => a.status === "credited").length,
+        played: awards.filter((a) => a.status === "played").length,
+        miniGamePayout: awards.reduce((sum, a) => sum + (a.outcome?.payout ?? 0), 0),
         revoked: awards.filter((a) => a.status === "revoked").length,
         creditValue: awards
           .filter((a) => a.status === "credited")

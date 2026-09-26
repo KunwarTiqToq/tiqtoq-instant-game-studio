@@ -1,3 +1,5 @@
+import type { TargetRound } from '../games/mini/target-round.js';
+import type { MiniConfig, MiniOutcome } from "../games/mini/mini-engine.js";
 import type { SpinResult } from "../games/slots/slot-engine.js";
 export interface Player {
   _id: string;
@@ -27,6 +29,7 @@ export interface Campaign {
   status: "draft" | "active" | "paused" | "archived";
   rewardType: "credits" | "wheel" | "chests" | "targets" | "scratch";
   rewardValue: number;
+  gameConfig?: MiniConfig;
   audience: Audience;
   createdAt: Date;
   updatedAt: Date;
@@ -37,7 +40,11 @@ export interface Award {
   campaignId: string | null;
   type: Campaign["rewardType"];
   value: number;
-  status: "pending" | "credited" | "revoked";
+  status: "pending" | "credited" | "revoked" | "played";
+  gameConfig?: MiniConfig;
+  outcome?: MiniOutcome;
+  targetRound?: TargetRound;
+  playedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
   requestId: string;

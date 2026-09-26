@@ -52,7 +52,7 @@ Players with fewer than 1 credit cannot spin. A transaction updates balance/coun
 
 List endpoints return up to 500 records; players, awards, and deposits support `?offset=500`. Campaign audiences and collections are intentionally simple PoC models. No arbitrary MongoDB query bodies are accepted.
 
-A campaign has `name`, `description`, `status` (`draft`, `active`, `paused`, `archived`), `rewardType`, `rewardValue`, and `audience`. Reward types are `credits`, `wheel`, `chests`, `targets`, `scratch`. Credits are delivered immediately. Other types create pending one-play awards; their gameplay, redemption, expiration, and prize settlement are future work. Campaigns run manually via Issue; no scheduler is implied.
+A campaign has `name`, `description`, `status` (`draft`, `active`, `paused`, `archived`), `rewardType`, `rewardValue`, and `audience`. Reward types are `credits`, `wheel`, `chests`, `targets`, `scratch`. Credits are delivered immediately. All four mini-games create pending one-play awards with optional `gameConfig`. Award expiration remains future work. Campaigns run manually via Issue; no scheduler is implied.
 
 ## WebSocket `/ws/games`
 
@@ -91,4 +91,45 @@ Tests create a disposable MongoDB replica set, never using `.env` or your databa
 
 ## Scope
 
-Local demo only: the administrative HTTP API has no operator authentication. Player tokens are simple demo session credentials, not a production identity system. Keep the default loopback binding. Starting credits are profile funding, not deposits. No real-money wallet, production gambling math, campaign scheduler, or mini-game redemption is implemented. Live balance notifications are in-process; a multi-instance deployment would need shared pub/sub.
+Local demo only: the administrative HTTP API has no operator authentication. Player tokens are simple demo session credentials, not a production identity system. Keep the default loopback binding. Starting credits are profile funding, not deposits. No real-money wallet, production gambling math, campaign scheduler is implemented. Live balance notifications are in-process; a multi-instance deployment would need shared pub/sub.
+
+## Mini-game awards
+
+Campaigns accept `gameConfig`; manual grants accept the same field. Example:
+
+```json
+{"mode":"multiplier","baseAmount":10,"prizes":[{"amount":1,"label":"Small"},{"amount":5,"label":"Big"}]}
+```
+
+Use `mode: "instant"` for direct credit amounts. `baseAmount` is required for multipliers. Wheel supports 2–16 prize entries; chests supports 2–12. Integer values only, equal odds per entry, maximum payout 1,000,000 credits. Omitted configs use game defaults. Legacy `rewardValue` / `value` remains required; use 1 for mini-games, whose payouts come from `gameConfig`. Configuration is copied onto each award when issued and cannot change retroactively.
+
+The authenticated WebSocket protocol adds:
+
+- `session.ready` includes `awards`, an ordered pending mini-game list.
+- `{type:"awards.updated",awards:[...]}` pushes that list only to sockets bound to the affected player.
+- `{type:"award.get",requestId,awardId}` reads an owned award.
+- `{type:"award.play",requestId,awardId,choiceIndex?}` settles it. Chests and scratch require a zero-based `choiceIndex`.
+- Both requests return `{type:"award.result",requestId,award:{id,type,status,config,outcome?},player}`.
+- `{type:"mini.preview",requestId,game:"wheel"|"chests"|"scratch",config?,choiceIndex?}` returns `{type:"mini.result",requestId,outcome}` without requiring a player or database, and never modifies a wallet.
+
+Settlement draws on the server and atomically credits the player and marks the award `played`, storing `outcome` and `playedAt`. Retries, reconnects and concurrent plays return the stored result without another credit. Clients cannot submit prize configs on awarded plays. Analytics exposes played counts and mini-game payout totals.
+
+### Target ranges and scratch layouts
+
+Targets accept `gameConfig.targetRange: {min,max}`. A hit draws uniformly from every integer in that inclusive range, then multiplies by `baseAmount` when `mode` is `multiplier`. The number of `prizes` entries determines the live bird count (3–12; legacy two-entry pools show three birds); entry amounts are unused when a range exists. Without a range, the configured list is the reward pool. Back-office forms always provide an explicit range for new target awards.
+
+Scratch supports an optional `mode` on each prize, overriding the overall mode for mixed instant/multiplier cards. A base is required if any zone is a multiplier. Chests and scratch responses include `outcome.revealedPrizes`, a permutation of configured prize indices keyed by visible choice index. The chosen entry matches `outcome.prizeIndex`; only this entry contributes to the wallet payout. The layout is saved atomically with settlement and remains unchanged on retries. No additional collection is needed.
+
+### Timed target rounds
+
+Targets use a separate WebSocket flow; `award.play` and `mini.preview` cannot redeem targets:
+
+- `{type:"targets.start",requestId,awardId}` starts or resumes the persisted round.
+- `{type:"targets.hit",requestId,awardId,targetId}` claims a currently active bird. Its replacement has a new ID; a duplicate ID cannot add another prize.
+- `{type:"targets.finish",requestId,awardId}` returns current state, settling only after the server deadline.
+
+Responses use `award.result` and include `award.targetRound` (`startedAt`, `endsAt`, `activeIds`, `hits`, summed `amount` and `payout`) and `award.serverNow`. All times are Unix milliseconds. `gameConfig.durationSeconds` defaults to 30 and allows 5–120 seconds. Starting again preserves the original deadline. A background sweep settles expired rounds, including after disconnect or server restart; award reads also settle expired rounds. Started rounds cannot be revoked.
+
+Settlement atomically credits the accumulated payout and saves a `total:true` outcome with `hitCount`. Replays return the same result. Hits at or after the deadline add nothing. For multiplier mode, payout is the sum of hit multipliers times `baseAmount`, rather than multiplying the multipliers together.
+
+Database-free previews use `{type:"targets.preview",requestId,action:"start"|"hit"|"finish",config?,targetId?}` on one persistent socket, returning `targets.result` with the same award-shaped state. Configuration is accepted on Start; hit messages cannot change it. Preview state is socket-local and never affects a player balance.

@@ -1,3 +1,4 @@
+import { miniConfigSchema } from "../games/mini/mini-engine.js";
 import { z } from "zod";
 export class DomainError extends Error {
   constructor(
@@ -43,6 +44,7 @@ export const campaignInput = z
     status: z.enum(["draft", "active", "paused", "archived"]).default("draft"),
     rewardType: z.enum(["credits", "wheel", "chests", "targets", "scratch"]),
     rewardValue: credits.min(1),
+    gameConfig: miniConfigSchema.optional(),
     audience: audienceInput,
   })
   .strict();
@@ -53,6 +55,7 @@ export const awardInput = z
   .object({
     playerId: id,
     type: campaignInput.shape.rewardType,
+    gameConfig: miniConfigSchema.optional(),
     value: credits.min(1),
     requestId,
   })

@@ -31,7 +31,9 @@ export async function initializeDatabase(client: MongoClient, db: Db) {
     c.rounds.createIndex({ playerId: 1, requestId: 1 }, { unique: true }),
     c.rounds.createIndex({ createdAt: -1 }),
     c.deposits.createIndex({ requestId: 1 }, { unique: true }),
+    c.awards.createIndex({type:1,status:1,'targetRound.endsAt':1}),
     c.awards.createIndex({ requestId: 1 }, { unique: true }),
+    c.awards.createIndex({ playerId: 1, status: 1, createdAt: 1 }),
     c.awards.createIndex(
       { campaignId: 1, playerId: 1 },
       {
