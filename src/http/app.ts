@@ -13,14 +13,24 @@ export function createApp(service: LiveOpsService | null = null) {
       origin: (
         process.env.BACK_OFFICE_ORIGINS ??
         "http://127.0.0.1:9999,http://localhost:9999"
-      ).split(",").map((origin) => origin.trim().replace(/\/$/, "")).filter(Boolean),
+      )
+        .split(",")
+        .map((origin) => origin.trim().replace(/\/$/, ""))
+        .filter(Boolean),
     }),
   );
   app.use(express.json({ limit: "32kb" }));
-  app.head("/clear-db", (_req, res) => { res.status(405).set("Allow", "GET").end(); });
+  app.head("/clear-db", (_req, res) => {
+    res.status(405).set("Allow", "GET").end();
+  });
   app.get("/clear-db", async (_req, res) => {
     res.set("Cache-Control", "no-store");
-    if (!service) throw new DomainError(503, "DATABASE_UNAVAILABLE", "Set MONGO_DB_CONNECTION_STRING in core-api/.env and restart core-api.");
+    if (!service)
+      throw new DomainError(
+        503,
+        "DATABASE_UNAVAILABLE",
+        "Set MONGO_DB_CONNECTION_STRING in core-api/.env and restart core-api.",
+      );
     res.json(await service.clearDatabase());
   });
   app.use("/api/back-office", backOfficeController(service));
@@ -31,16 +41,14 @@ export function createApp(service: LiveOpsService | null = null) {
   });
   const errors: express.ErrorRequestHandler = (error, _req, res, _next) => {
     if (error instanceof ZodError) {
-      res
-        .status(400)
-        .json({
-          error: {
-            code: "VALIDATION_ERROR",
-            message: error.issues
-              .map((i) => `${i.path.join(".")}: ${i.message}`)
-              .join("; "),
-          },
-        });
+      res.status(400).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.issues
+            .map((i) => `${i.path.join(".")}: ${i.message}`)
+            .join("; "),
+        },
+      });
       return;
     }
     if (error instanceof DomainError) {
@@ -50,35 +58,29 @@ export function createApp(service: LiveOpsService | null = null) {
       return;
     }
     if (error.type === "entity.parse.failed") {
-      res
-        .status(400)
-        .json({
-          error: { code: "INVALID_JSON", message: "Invalid JSON body." },
-        });
+      res.status(400).json({
+        error: { code: "INVALID_JSON", message: "Invalid JSON body." },
+      });
       return;
     }
     if (error.code === 11000) {
-      res
-        .status(409)
-        .json({
-          error: {
-            code: "DUPLICATE_REQUEST",
-            message:
-              "This operation has already been recorded. Refresh to see the result.",
-          },
-        });
+      res.status(409).json({
+        error: {
+          code: "DUPLICATE_REQUEST",
+          message:
+            "This operation has already been recorded. Refresh to see the result.",
+        },
+      });
       return;
     }
     console.error("HTTP operation failed:", error.name);
-    res
-      .status(500)
-      .json({
-        error: {
-          code: "INTERNAL_ERROR",
-          message:
-            "Operation failed. Check database connectivity and server logs.",
-        },
-      });
+    res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message:
+          "Operation failed. Check database connectivity and server logs.",
+      },
+    });
   };
   app.use(errors);
   return app;

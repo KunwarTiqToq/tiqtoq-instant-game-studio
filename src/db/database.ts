@@ -33,7 +33,7 @@ export async function initializeDatabase(client: MongoClient, db: Db) {
     c.rounds.createIndex({ playerId: 1, requestId: 1 }, { unique: true }),
     c.rounds.createIndex({ createdAt: -1 }),
     c.deposits.createIndex({ requestId: 1 }, { unique: true }),
-    c.awards.createIndex({type:1,status:1,'targetRound.endsAt':1}),
+    c.awards.createIndex({ type: 1, status: 1, "targetRound.endsAt": 1 }),
     c.awards.createIndex({ requestId: 1 }, { unique: true }),
     c.awards.createIndex({ playerId: 1, status: 1, createdAt: 1 }),
     c.awards.createIndex(
@@ -49,6 +49,9 @@ export async function initializeDatabase(client: MongoClient, db: Db) {
   ]);
   // Replace the old once-per-campaign constraint after the per-run index exists.
   // Existing award documents remain unchanged.
-  try { await c.awards.dropIndex('campaignId_1_playerId_1'); }
-  catch (error) { if ((error as {code?:number}).code !== 27) throw error; }
+  try {
+    await c.awards.dropIndex("campaignId_1_playerId_1");
+  } catch (error) {
+    if ((error as { code?: number }).code !== 27) throw error;
+  }
 }

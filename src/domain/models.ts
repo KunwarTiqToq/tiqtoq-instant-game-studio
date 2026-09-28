@@ -1,4 +1,4 @@
-import type { TargetRound } from '../games/mini/target-round.js';
+import type { TargetRound } from "../games/mini/target-round.js";
 import type { MiniConfig, MiniOutcome } from "../games/mini/mini-engine.js";
 import type { SpinResult } from "../games/slots/slot-engine.js";
 export interface Player {

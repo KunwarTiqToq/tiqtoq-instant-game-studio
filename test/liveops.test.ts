@@ -156,7 +156,10 @@ test(
         const before = (await service.getPlayer(player._id)).balance;
         const issued = await service.issueCampaign(c._id);
         assert.equal(issued.granted, 1);
-        assert.equal((await service.issueCampaign(c._id, issued.issuanceId)).granted, 1);
+        assert.equal(
+          (await service.issueCampaign(c._id, issued.issuanceId)).granted,
+          1,
+        );
         assert.equal(
           (await service.getPlayer(player._id)).balance,
           before + 25,
@@ -252,6 +255,7 @@ test(
         await once(socket, "open");
         t.after(() => socket.terminate());
         const exchange = (message: Record<string, unknown>) =>
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Assertions inspect heterogeneous WebSocket JSON payloads.
           new Promise<Record<string, any>>((resolve) => {
             const listener = (data: WebSocket.RawData) => {
               const response = JSON.parse(data.toString());
@@ -297,6 +301,7 @@ test(
           requestId: "ws-spin",
         });
         assert.equal(first.result.spinId, again.result.spinId);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Assertions inspect heterogeneous WebSocket JSON payloads.
         const pushed = new Promise<Record<string, any>>((resolve) => {
           socket.on("message", (data) => {
             const m = JSON.parse(data.toString());

@@ -1,5 +1,15 @@
-import { startTargetRound, hitTarget, targetOutcome } from '../games/mini/target-round.js';
-import { isMiniType, defaultMiniConfig, drawMini, validateMiniConfig, type MiniConfig } from "../games/mini/mini-engine.js";
+import {
+  startTargetRound,
+  hitTarget,
+  targetOutcome,
+} from "../games/mini/target-round.js";
+import {
+  isMiniType,
+  defaultMiniConfig,
+  drawMini,
+  validateMiniConfig,
+  type MiniConfig,
+} from "../games/mini/mini-engine.js";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import type { MongoClient, Db, ClientSession, Filter } from "mongodb";
@@ -39,17 +49,34 @@ export class LiveOpsService extends EventEmitter {
     });
   }
   async clearDatabase() {
-    const collections = await this.db.listCollections({}, {nameOnly:false}).toArray();
-    const names = collections.filter((collection) => collection.type === 'collection' && !collection.name.startsWith('system.')).map((collection) => collection.name);
+    const collections = await this.db
+      .listCollections({}, { nameOnly: false })
+      .toArray();
+    const names = collections
+      .filter(
+        (collection) =>
+          collection.type === "collection" &&
+          !collection.name.startsWith("system."),
+      )
+      .map((collection) => collection.name);
     const deletedByCollection = await this.transaction(async (session) => {
-      const counts: Record<string,number> = {};
+      const counts: Record<string, number> = {};
       for (const name of names) {
-        const result = await this.db.collection(name).deleteMany({}, {session});
+        const result = await this.db
+          .collection(name)
+          .deleteMany({}, { session });
         counts[name] = result.deletedCount;
       }
       return counts;
     });
-    return {database:this.db.databaseName, deletedCount:Object.values(deletedByCollection).reduce((sum,count)=>sum+count,0), collections:deletedByCollection};
+    return {
+      database: this.db.databaseName,
+      deletedCount: Object.values(deletedByCollection).reduce(
+        (sum, count) => sum + count,
+        0,
+      ),
+      collections: deletedByCollection,
+    };
   }
   async getPlayer(playerId: string, session?: ClientSession) {
     const player = await this.c.players.findOne({ _id: playerId }, { session });
@@ -246,7 +273,8 @@ export class LiveOpsService extends EventEmitter {
   async createCampaign(
     input: Omit<Campaign, "_id" | "createdAt" | "updatedAt">,
   ) {
-    if (input.gameConfig && isMiniType(input.rewardType)) validateMiniConfig(input.rewardType, input.gameConfig);
+    if (input.gameConfig && isMiniType(input.rewardType))
+      validateMiniConfig(input.rewardType, input.gameConfig);
     const campaign: Campaign = {
       _id: randomUUID(),
       ...input,
@@ -260,7 +288,8 @@ export class LiveOpsService extends EventEmitter {
     campaignId: string,
     input: Omit<Campaign, "_id" | "createdAt" | "updatedAt">,
   ) {
-    if (input.gameConfig && isMiniType(input.rewardType)) validateMiniConfig(input.rewardType, input.gameConfig);
+    if (input.gameConfig && isMiniType(input.rewardType))
+      validateMiniConfig(input.rewardType, input.gameConfig);
     const c = await this.c.campaigns.findOneAndUpdate(
       { _id: campaignId },
       { $set: { ...input, updatedAt: new Date() } },
@@ -327,7 +356,11 @@ export class LiveOpsService extends EventEmitter {
         };
       }
       const gameConfig = isMiniType(input.type)
-        ? validateMiniConfig(input.type, input.gameConfig ?? defaultMiniConfig(input.type)) : undefined;
+        ? validateMiniConfig(
+            input.type,
+            input.gameConfig ?? defaultMiniConfig(input.type),
+          )
+        : undefined;
       const record: Award = {
         _id: randomUUID(),
         ...input,
@@ -354,45 +387,99 @@ export class LiveOpsService extends EventEmitter {
     let run;
     try {
       run = await this.transaction(async (session) => {
-        const prior = await this.c.campaignRuns.findOne({_id:issuanceId},{session});
+        const prior = await this.c.campaignRuns.findOne(
+          { _id: issuanceId },
+          { session },
+        );
         if (prior) {
-          if (prior.campaignId !== campaignId) throw new DomainError(409,'IDEMPOTENCY_CONFLICT','Issuance ID belongs to another campaign.');
+          if (prior.campaignId !== campaignId)
+            throw new DomainError(
+              409,
+              "IDEMPOTENCY_CONFLICT",
+              "Issuance ID belongs to another campaign.",
+            );
           return prior;
         }
-        const campaign = await this.c.campaigns.findOne({_id:campaignId,status:'active'},{session});
-        if (!campaign) throw new DomainError(409,'CAMPAIGN_INACTIVE','Activate the campaign before issuing awards.');
+        const campaign = await this.c.campaigns.findOne(
+          { _id: campaignId, status: "active" },
+          { session },
+        );
+        if (!campaign)
+          throw new DomainError(
+            409,
+            "CAMPAIGN_INACTIVE",
+            "Activate the campaign before issuing awards.",
+          );
         // Every new run matches current persisted data in one consistent snapshot.
-        const eligible = await this.c.players.find(this.audienceFilter(campaign.audience),{session}).limit(501).toArray();
-        if (eligible.length > 500) throw new DomainError(400,'AUDIENCE_TOO_LARGE','Narrow the audience to at most 500 players for this PoC.');
+        const eligible = await this.c.players
+          .find(this.audienceFilter(campaign.audience), { session })
+          .limit(501)
+          .toArray();
+        if (eligible.length > 500)
+          throw new DomainError(
+            400,
+            "AUDIENCE_TOO_LARGE",
+            "Narrow the audience to at most 500 players for this PoC.",
+          );
         const gameConfig = isMiniType(campaign.rewardType)
-          ? validateMiniConfig(campaign.rewardType,campaign.gameConfig ?? defaultMiniConfig(campaign.rewardType)) : undefined;
+          ? validateMiniConfig(
+              campaign.rewardType,
+              campaign.gameConfig ?? defaultMiniConfig(campaign.rewardType),
+            )
+          : undefined;
         const now = new Date();
         const awards: Award[] = eligible.map((player) => ({
-          _id:randomUUID(),playerId:player._id,campaignId,issuanceId,
-          type:campaign.rewardType,value:campaign.rewardValue,
-          ...(gameConfig ? {gameConfig} : {}),
-          requestId:`campaign:${issuanceId}:${player._id}`,
-          status:campaign.rewardType === 'credits' ? 'credited' : 'pending',createdAt:now,updatedAt:now,
+          _id: randomUUID(),
+          playerId: player._id,
+          campaignId,
+          issuanceId,
+          type: campaign.rewardType,
+          value: campaign.rewardValue,
+          ...(gameConfig ? { gameConfig } : {}),
+          requestId: `campaign:${issuanceId}:${player._id}`,
+          status: campaign.rewardType === "credits" ? "credited" : "pending",
+          createdAt: now,
+          updatedAt: now,
         }));
         if (awards.length) {
-          await this.c.awards.insertMany(awards,{session});
-          if (campaign.rewardType === 'credits') await this.c.players.updateMany(
-            {_id:{$in:eligible.map((player)=>player._id)}},{$inc:{balance:campaign.rewardValue}},{session});
+          await this.c.awards.insertMany(awards, { session });
+          if (campaign.rewardType === "credits")
+            await this.c.players.updateMany(
+              { _id: { $in: eligible.map((player) => player._id) } },
+              { $inc: { balance: campaign.rewardValue } },
+              { session },
+            );
         }
-        const record = {_id:issuanceId,campaignId,playerIds:eligible.map((player)=>player._id),eligible:eligible.length,granted:awards.length,skipped:0,createdAt:now};
-        await this.c.campaignRuns.insertOne(record,{session});
+        const record = {
+          _id: issuanceId,
+          campaignId,
+          playerIds: eligible.map((player) => player._id),
+          eligible: eligible.length,
+          granted: awards.length,
+          skipped: 0,
+          createdAt: now,
+        };
+        await this.c.campaignRuns.insertOne(record, { session });
         return record;
       });
     } catch (error) {
       // Concurrent retries can race on the run's unique ID. The winning transaction
       // committed the entire issuance, so returning its result is safe.
-      if ((error as {code?:number}).code !== 11000) throw error;
-      const prior = await this.c.campaignRuns.findOne({_id:issuanceId});
+      if ((error as { code?: number }).code !== 11000) throw error;
+      const prior = await this.c.campaignRuns.findOne({ _id: issuanceId });
       if (!prior || prior.campaignId !== campaignId) throw error;
       run = prior;
     }
-    for (const playerId of run.playerIds) { this.emit('player',playerId); this.emit('awards',playerId); }
-    return {issuanceId:run._id,eligible:run.eligible,granted:run.granted,skipped:run.skipped};
+    for (const playerId of run.playerIds) {
+      this.emit("player", playerId);
+      this.emit("awards", playerId);
+    }
+    return {
+      issuanceId: run._id,
+      eligible: run.eligible,
+      granted: run.granted,
+      skipped: run.skipped,
+    };
   }
   async revoke(awardId: string) {
     const award = await this.c.awards.findOneAndUpdate(
@@ -410,75 +497,217 @@ export class LiveOpsService extends EventEmitter {
     return award;
   }
   async pendingAwards(playerId: string) {
-    return this.c.awards.find({ playerId, status: 'pending', type: { $in: ['wheel', 'chests', 'targets', 'scratch'] } }).sort({ createdAt: 1, _id: 1 }).toArray();
+    return this.c.awards
+      .find({
+        playerId,
+        status: "pending",
+        type: { $in: ["wheel", "chests", "targets", "scratch"] },
+      })
+      .sort({ createdAt: 1, _id: 1 })
+      .toArray();
   }
   async getAward(playerId: string, awardId: string) {
     const award = await this.c.awards.findOne({ _id: awardId, playerId });
-    if (!award) throw new DomainError(404, 'AWARD_NOT_FOUND', 'Award not found for this player.');
-    if (!isMiniType(award.type)) throw new DomainError(400, 'UNSUPPORTED_GAME', 'This award is not a mini-game.');
-    if (award.type === 'targets' && award.status === 'pending' && award.targetRound && award.targetRound.endsAt <= Date.now()) {
-      const finished = await this.targetAction(playerId, awardId, 'finish');
-      return {...finished, gameConfig: finished.gameConfig ?? defaultMiniConfig('targets')};
+    if (!award)
+      throw new DomainError(
+        404,
+        "AWARD_NOT_FOUND",
+        "Award not found for this player.",
+      );
+    if (!isMiniType(award.type))
+      throw new DomainError(
+        400,
+        "UNSUPPORTED_GAME",
+        "This award is not a mini-game.",
+      );
+    if (
+      award.type === "targets" &&
+      award.status === "pending" &&
+      award.targetRound &&
+      award.targetRound.endsAt <= Date.now()
+    ) {
+      const finished = await this.targetAction(playerId, awardId, "finish");
+      return {
+        ...finished,
+        gameConfig: finished.gameConfig ?? defaultMiniConfig("targets"),
+      };
     }
-    return { ...award, gameConfig: award.gameConfig ?? defaultMiniConfig(award.type) };
+    return {
+      ...award,
+      gameConfig: award.gameConfig ?? defaultMiniConfig(award.type),
+    };
   }
   async playAward(playerId: string, awardId: string, choiceIndex?: number) {
     const award = await this.transaction(async (session) => {
-      const stored = await this.c.awards.findOne({ _id: awardId, playerId }, { session });
-      if (!stored) throw new DomainError(404, 'AWARD_NOT_FOUND', 'Award not found for this player.');
-      const player = await this.getPlayer(playerId, session); this.active(player);
-      if (stored.status === 'played') return stored;
-      if (stored.status !== 'pending') throw new DomainError(409, 'AWARD_UNAVAILABLE', 'This award is no longer available.');
-      if (!isMiniType(stored.type)) throw new DomainError(400, 'UNSUPPORTED_GAME', 'This mini-game is not available yet.');
-      if (stored.type === 'targets') throw new DomainError(400, 'TIMED_ROUND_REQUIRED', 'Start the timed target round to play this award.');
+      const stored = await this.c.awards.findOne(
+        { _id: awardId, playerId },
+        { session },
+      );
+      if (!stored)
+        throw new DomainError(
+          404,
+          "AWARD_NOT_FOUND",
+          "Award not found for this player.",
+        );
+      const player = await this.getPlayer(playerId, session);
+      this.active(player);
+      if (stored.status === "played") return stored;
+      if (stored.status !== "pending")
+        throw new DomainError(
+          409,
+          "AWARD_UNAVAILABLE",
+          "This award is no longer available.",
+        );
+      if (!isMiniType(stored.type))
+        throw new DomainError(
+          400,
+          "UNSUPPORTED_GAME",
+          "This mini-game is not available yet.",
+        );
+      if (stored.type === "targets")
+        throw new DomainError(
+          400,
+          "TIMED_ROUND_REQUIRED",
+          "Start the timed target round to play this award.",
+        );
       const config = stored.gameConfig ?? defaultMiniConfig(stored.type);
       let outcome;
-      try { outcome = drawMini(stored.type, config, choiceIndex); }
-      catch (error) { throw new DomainError(400, 'INVALID_CHOICE', error instanceof Error ? error.message : 'Invalid game choice.'); }
+      try {
+        outcome = drawMini(stored.type, config, choiceIndex);
+      } catch (error) {
+        throw new DomainError(
+          400,
+          "INVALID_CHOICE",
+          error instanceof Error ? error.message : "Invalid game choice.",
+        );
+      }
       const now = new Date();
-      await this.c.players.updateOne({ _id: playerId }, { $inc: { balance: outcome.payout } }, { session });
-      const updated = await this.c.awards.findOneAndUpdate({ _id: awardId, playerId, status: 'pending' }, { $set: { status: 'played', gameConfig: config, outcome, playedAt: now, updatedAt: now } }, { session, returnDocument: 'after' });
-      if (!updated) throw new DomainError(409, 'AWARD_UNAVAILABLE', 'Award already processed.');
+      await this.c.players.updateOne(
+        { _id: playerId },
+        { $inc: { balance: outcome.payout } },
+        { session },
+      );
+      const updated = await this.c.awards.findOneAndUpdate(
+        { _id: awardId, playerId, status: "pending" },
+        {
+          $set: {
+            status: "played",
+            gameConfig: config,
+            outcome,
+            playedAt: now,
+            updatedAt: now,
+          },
+        },
+        { session, returnDocument: "after" },
+      );
+      if (!updated)
+        throw new DomainError(
+          409,
+          "AWARD_UNAVAILABLE",
+          "Award already processed.",
+        );
       return updated;
     });
-    this.emit('player', playerId);
-    this.emit('awards', playerId);
+    this.emit("player", playerId);
+    this.emit("awards", playerId);
     return award;
   }
-  async targetAction(playerId: string, awardId: string, action: 'start' | 'hit' | 'finish', targetId?: string) {
+  async targetAction(
+    playerId: string,
+    awardId: string,
+    action: "start" | "hit" | "finish",
+    targetId?: string,
+  ) {
     const award = await this.transaction(async (session) => {
-      const stored = await this.c.awards.findOne({ _id: awardId, playerId }, { session });
-      if (!stored || stored.type !== 'targets') throw new DomainError(404, 'AWARD_NOT_FOUND', 'Target award not found for this player.');
-      if (stored.status === 'played') return stored;
-      if (stored.status !== 'pending') throw new DomainError(409, 'AWARD_UNAVAILABLE', 'This award is no longer available.');
+      const stored = await this.c.awards.findOne(
+        { _id: awardId, playerId },
+        { session },
+      );
+      if (!stored || stored.type !== "targets")
+        throw new DomainError(
+          404,
+          "AWARD_NOT_FOUND",
+          "Target award not found for this player.",
+        );
+      if (stored.status === "played") return stored;
+      if (stored.status !== "pending")
+        throw new DomainError(
+          409,
+          "AWARD_UNAVAILABLE",
+          "This award is no longer available.",
+        );
       // A running round must still settle if the player is archived during it.
-      if (!stored.targetRound) this.active(await this.getPlayer(playerId, session));
-      const config = stored.gameConfig ?? defaultMiniConfig('targets');
+      if (!stored.targetRound)
+        this.active(await this.getPlayer(playerId, session));
+      const config = stored.gameConfig ?? defaultMiniConfig("targets");
       let round = stored.targetRound;
       const now = Date.now();
       if (!round) {
-        if (action !== 'start') throw new DomainError(400, 'ROUND_NOT_STARTED', 'Start the round first.');
+        if (action !== "start")
+          throw new DomainError(
+            400,
+            "ROUND_NOT_STARTED",
+            "Start the round first.",
+          );
         round = startTargetRound(config, now);
-      } else if (action === 'hit' && now < round.endsAt) {
-        try { round = hitTarget(round, config, targetId!, now); }
-        catch { throw new DomainError(400, 'INVALID_TARGET', 'This target is not active.'); }
+      } else if (action === "hit" && now < round.endsAt) {
+        try {
+          round = hitTarget(round, config, targetId!, now);
+        } catch {
+          throw new DomainError(
+            400,
+            "INVALID_TARGET",
+            "This target is not active.",
+          );
+        }
       }
       const ended = now >= round.endsAt;
       const outcome = ended ? targetOutcome(round, config) : undefined;
-      if (outcome) await this.c.players.updateOne({ _id: playerId }, { $inc: {balance: outcome.payout} }, { session });
-      const updated = await this.c.awards.findOneAndUpdate({ _id: awardId, status: 'pending' }, {
-        $set: { targetRound: round, gameConfig: config, updatedAt: new Date(now),
-          ...(outcome ? { status: 'played' as const, outcome, playedAt: new Date(now) } : {}) }
-      }, { session, returnDocument: 'after' });
-      if (!updated) throw new DomainError(409, 'AWARD_UNAVAILABLE', 'Award already processed.');
+      if (outcome)
+        await this.c.players.updateOne(
+          { _id: playerId },
+          { $inc: { balance: outcome.payout } },
+          { session },
+        );
+      const updated = await this.c.awards.findOneAndUpdate(
+        { _id: awardId, status: "pending" },
+        {
+          $set: {
+            targetRound: round,
+            gameConfig: config,
+            updatedAt: new Date(now),
+            ...(outcome
+              ? { status: "played" as const, outcome, playedAt: new Date(now) }
+              : {}),
+          },
+        },
+        { session, returnDocument: "after" },
+      );
+      if (!updated)
+        throw new DomainError(
+          409,
+          "AWARD_UNAVAILABLE",
+          "Award already processed.",
+        );
       return updated;
     });
-    if (award.status === 'played') { this.emit('player', playerId); this.emit('awards', playerId); }
+    if (award.status === "played") {
+      this.emit("player", playerId);
+      this.emit("awards", playerId);
+    }
     return award;
   }
   async settleExpiredTargets() {
-    const expired = await this.c.awards.find({type:'targets',status:'pending','targetRound.endsAt':{$lte:Date.now()}}).limit(100).toArray();
-    for (const award of expired) await this.targetAction(award.playerId,award._id,'finish');
+    const expired = await this.c.awards
+      .find({
+        type: "targets",
+        status: "pending",
+        "targetRound.endsAt": { $lte: Date.now() },
+      })
+      .limit(100)
+      .toArray();
+    for (const award of expired)
+      await this.targetAction(award.playerId, award._id, "finish");
   }
   async simulateSession(playerId: string, daysAgo: number) {
     const date = new Date();
@@ -613,7 +842,10 @@ export class LiveOpsService extends EventEmitter {
         pending: awards.filter((a) => a.status === "pending").length,
         credited: awards.filter((a) => a.status === "credited").length,
         played: awards.filter((a) => a.status === "played").length,
-        miniGamePayout: awards.reduce((sum, a) => sum + (a.outcome?.payout ?? 0), 0),
+        miniGamePayout: awards.reduce(
+          (sum, a) => sum + (a.outcome?.payout ?? 0),
+          0,
+        ),
         revoked: awards.filter((a) => a.status === "revoked").length,
         creditValue: awards
           .filter((a) => a.status === "credited")

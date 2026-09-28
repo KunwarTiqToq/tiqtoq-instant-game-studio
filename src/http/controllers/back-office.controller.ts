@@ -17,13 +17,11 @@ export function backOfficeController(service: LiveOpsService | null) {
   const router = Router();
   router.get("/health", async (_req, res) => {
     if (!service) {
-      res
-        .status(503)
-        .json({
-          ready: false,
-          message:
-            "Set MONGO_DB_CONNECTION_STRING in core-api/.env and restart core-api.",
-        });
+      res.status(503).json({
+        ready: false,
+        message:
+          "Set MONGO_DB_CONNECTION_STRING in core-api/.env and restart core-api.",
+      });
       return;
     }
     await service.db.command({ ping: 1 });
@@ -41,9 +39,11 @@ export function backOfficeController(service: LiveOpsService | null) {
         ),
   );
   const s = service!;
-  router.head('/database/clear', (_req,res) => { res.status(405).set('Allow','GET').end(); });
-  router.get('/database/clear', async (_req,res) => {
-    res.set('Cache-Control','no-store');
+  router.head("/database/clear", (_req, res) => {
+    res.status(405).set("Allow", "GET").end();
+  });
+  router.get("/database/clear", async (_req, res) => {
+    res.set("Cache-Control", "no-store");
     res.json(await s.clearDatabase());
   });
   const page = (value: unknown) =>
@@ -112,8 +112,11 @@ export function backOfficeController(service: LiveOpsService | null) {
     res.json(c);
   });
   router.post("/campaigns/:id/issue", async (req, res) => {
-    const {issuanceId} = z.object({issuanceId:id.optional()}).strict().parse(req.body ?? {});
-    res.json(await s.issueCampaign(id.parse(req.params.id),issuanceId));
+    const { issuanceId } = z
+      .object({ issuanceId: id.optional() })
+      .strict()
+      .parse(req.body ?? {});
+    res.json(await s.issueCampaign(id.parse(req.params.id), issuanceId));
   });
   router.get("/awards", async (req, res) =>
     res.json(

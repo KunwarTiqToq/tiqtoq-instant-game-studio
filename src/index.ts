@@ -8,7 +8,11 @@ const port = Number(process.env.PORT ?? 5555);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("PORT must be an integer between 1 and 65535.");
 }
-const host = process.env.HOST ?? (process.env.DYNO || process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
+const host =
+  process.env.HOST ??
+  (process.env.DYNO || process.env.NODE_ENV === "production"
+    ? "0.0.0.0"
+    : "127.0.0.1");
 let client: MongoClient | null = null;
 let service: LiveOpsService | null = null;
 const connectionString = process.env.MONGO_DB_CONNECTION_STRING;

@@ -23,11 +23,11 @@ Back-office origin defaults to `http://127.0.0.1:9999` and `http://localhost:999
 
 Credits are integers. Each spin costs exactly **1 credit**, deducted once. Every three-of-a-kind winning way pays the following multiplier of that bet:
 
-| Symbol IDs | Game symbols | Per-way multiplier |
-| --- | --- | --- |
-| 0–2 | Cherries, lemon, grapes | 1× |
-| 3–5 | Bell, star, diamond | 3× |
-| 6–9 | Clover, crown, horseshoe, planet | 10× |
+| Symbol IDs | Game symbols                     | Per-way multiplier |
+| ---------- | -------------------------------- | ------------------ |
+| 0–2        | Cherries, lemon, grapes          | 1×                 |
+| 3–5        | Bell, star, diamond              | 3×                 |
+| 6–9        | Clover, crown, horseshoe, planet | 10×                |
 
 The total payout is the sum of all winning ways. Example: two crown ways pay 20 credits, giving a net balance change of +19 after the stake. Payout includes the entire return; no extra stake refund is added. There are 27 ways. With uniform independent symbols, this intentionally simple paytable is not tuned to a target RTP.
 
@@ -59,13 +59,13 @@ A campaign has `name`, `description`, `status` (`draft`, `active`, `paused`, `ar
 First send a session request:
 
 ```json
-{"type":"session.open","requestId":"open-1"}
+{ "type": "session.open", "requestId": "open-1" }
 ```
 
 Without credentials this provisions a demo player with 100 credits and records a session. The response is `{ type: 'session.ready', requestId, player: { id, displayName, balance, status }, token }`. Reconnect using `playerId` and `token` in `session.open`. One player is bound to each socket; spin messages cannot select a different player.
 
 ```json
-{"type":"slot.spin","requestId":"unique-spin-id"}
+{ "type": "slot.spin", "requestId": "unique-spin-id" }
 ```
 
 The response is `{ type: 'slot.result', requestId, result, player }`. `result` contains `spinId`, row-major `matrix[row][reel]`, all 27 `ways`, matching `wins`, `winCount`, `bet`, `payout`, and settlement `balance`. Each way contains a stable ID, selected rows, cell positions, symbols, and `isWin`.
@@ -98,7 +98,14 @@ Local demo only: the administrative HTTP API has no operator authentication. Pla
 Campaigns accept `gameConfig`; manual grants accept the same field. Example:
 
 ```json
-{"mode":"multiplier","baseAmount":10,"prizes":[{"amount":1,"label":"Small"},{"amount":5,"label":"Big"}]}
+{
+  "mode": "multiplier",
+  "baseAmount": 10,
+  "prizes": [
+    { "amount": 1, "label": "Small" },
+    { "amount": 5, "label": "Big" }
+  ]
+}
 ```
 
 Use `mode: "instant"` for direct credit amounts. `baseAmount` is required for multipliers. Wheel supports 2–16 prize entries; chests supports 2–12. Integer values only, equal odds per entry, maximum payout 1,000,000 credits. Omitted configs use game defaults. Legacy `rewardValue` / `value` remains required; use 1 for mini-games, whose payouts come from `gameConfig`. Configuration is copied onto each award when issued and cannot change retroactively.
@@ -149,3 +156,9 @@ No parameters or authentication are required. The response contains `database`, 
 ## Heroku deployment
 
 See [HEROKU.md](HEROKU.md) for all three apps. Production binds to `0.0.0.0` by default and uses `$PORT`; the game WebSocket shares that port. Keep one API web dyno because live player/award pushes use an in-process event bus.
+
+## Code quality
+
+Run `npm run lint` to check JavaScript and TypeScript, or `npm run lint:fix` to apply automatic fixes. Run `npm run format` to format the project with Prettier, and `npm run format:check` to check formatting without changing files. Build output, dependencies, coverage, and local environment files are excluded.
+
+TypeScript is pinned to the 6.0 minor series supported by typescript-eslint. Upgrade them together when newer compiler support is available.

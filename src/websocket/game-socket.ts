@@ -1,6 +1,16 @@
-import { startTargetRound, hitTarget, targetOutcome, type TargetRound } from '../games/mini/target-round.js';
-import type { MiniConfig } from '../games/mini/mini-engine.js';
-import { isMiniType, defaultMiniConfig, drawMini, validateMiniConfig } from "../games/mini/mini-engine.js";
+import {
+  startTargetRound,
+  hitTarget,
+  targetOutcome,
+  type TargetRound,
+} from "../games/mini/target-round.js";
+import type { MiniConfig } from "../games/mini/mini-engine.js";
+import {
+  isMiniType,
+  defaultMiniConfig,
+  drawMini,
+  validateMiniConfig,
+} from "../games/mini/mini-engine.js";
 import type { Award } from "../domain/models.js";
 import type { Server } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
@@ -25,28 +35,51 @@ export function attachGameSocket(
   const awaitingPong = new Set<WebSocket>();
   const heartbeat = setInterval(() => {
     for (const socket of wss.clients) {
-      if (awaitingPong.has(socket)) { socket.terminate(); continue; }
-      if (socket.readyState === WebSocket.OPEN) { awaitingPong.add(socket); socket.ping(); }
+      if (awaitingPong.has(socket)) {
+        socket.terminate();
+        continue;
+      }
+      if (socket.readyState === WebSocket.OPEN) {
+        awaitingPong.add(socket);
+        socket.ping();
+      }
     }
   }, heartbeatIntervalMs);
   heartbeat.unref();
-  wss.on('close', () => { clearInterval(heartbeat); awaitingPong.clear(); });
+  wss.on("close", () => {
+    clearInterval(heartbeat);
+    awaitingPong.clear();
+  });
   let sweeping = false;
   const sweep = setInterval(async () => {
     if (!service || sweeping) return;
     sweeping = true;
-    try { await service.settleExpiredTargets(); } catch { /* Retry next sweep; results remain persisted. */ }
-    finally { sweeping = false; }
+    try {
+      await service.settleExpiredTargets();
+    } catch {
+      /* Retry next sweep; results remain persisted. */
+    } finally {
+      sweeping = false;
+    }
   }, 500);
   sweep.unref();
-  wss.on('close', () => clearInterval(sweep));
-  const visibleAward = (a: Award) => ({ id: a._id, type: a.type, status: a.status, config: a.gameConfig ?? defaultMiniConfig(isMiniType(a.type) ? a.type : 'wheel'), outcome: a.outcome, targetRound: a.targetRound, serverNow: Date.now() });
+  wss.on("close", () => clearInterval(sweep));
+  const visibleAward = (a: Award) => ({
+    id: a._id,
+    type: a.type,
+    status: a.status,
+    config:
+      a.gameConfig ?? defaultMiniConfig(isMiniType(a.type) ? a.type : "wheel"),
+    outcome: a.outcome,
+    targetRound: a.targetRound,
+    serverNow: Date.now(),
+  });
   wss.on("connection", (socket) => {
-    socket.on('pong', () => awaitingPong.delete(socket));
-    socket.on('close', () => awaitingPong.delete(socket));
+    socket.on("pong", () => awaitingPong.delete(socket));
+    socket.on("close", () => awaitingPong.delete(socket));
     let playerId: string | null = null;
     let busy = false;
-    let previewRound: {config: MiniConfig; round: TargetRound} | undefined;
+    let previewRound: { config: MiniConfig; round: TargetRound } | undefined;
     const send = (message: unknown) => {
       if (socket.readyState === WebSocket.OPEN)
         socket.send(JSON.stringify(message));
@@ -69,12 +102,21 @@ export function attachGameSocket(
     };
     const updateAwards = async (changedId: string) => {
       if (changedId !== playerId || !service) return;
-      try { send({ type: 'awards.updated', awards: (await service.pendingAwards(changedId)).map(visibleAward) }); }
-      catch { /* Session reconnect reloads the persisted queue. */ }
+      try {
+        send({
+          type: "awards.updated",
+          awards: (await service.pendingAwards(changedId)).map(visibleAward),
+        });
+      } catch {
+        /* Session reconnect reloads the persisted queue. */
+      }
     };
     service?.on("player", updatePlayer);
     service?.on("awards", updateAwards);
-    socket.on("close", () => { service?.off("player", updatePlayer); service?.off("awards", updateAwards); });
+    socket.on("close", () => {
+      service?.off("player", updatePlayer);
+      service?.off("awards", updateAwards);
+    });
     socket.on("error", () => console.error("Game socket connection error."));
     socket.on("message", async (data, isBinary) => {
       if (isBinary) return fail("INVALID_MESSAGE", "Send a JSON text message.");
@@ -93,36 +135,115 @@ export function attachGameSocket(
           "requestId must be a non-empty string of at most 128 characters.",
         );
       const rid = parsedId.data;
-      if (!["session.open", "slot.spin", "award.get", "award.play", "mini.preview", "targets.start", "targets.hit", "targets.finish", "targets.preview"].includes(message.type))
+      if (
+        ![
+          "session.open",
+          "slot.spin",
+          "award.get",
+          "award.play",
+          "mini.preview",
+          "targets.start",
+          "targets.hit",
+          "targets.finish",
+          "targets.preview",
+        ].includes(message.type)
+      )
         return fail(
           "UNKNOWN_MESSAGE_TYPE",
           "Supported types: session.open, slot.spin, award.get, award.play, mini.preview.",
           rid,
         );
-      if (message.type === 'targets.preview') {
+      if (message.type === "targets.preview") {
         try {
-          const input = z.object({type:z.literal('targets.preview'),requestId,action:z.enum(['start','hit','finish']),config:z.unknown().optional(),targetId:z.string().min(1).max(128).optional()}).strict().parse(message);
-          if (input.action === 'start') {
+          const input = z
+            .object({
+              type: z.literal("targets.preview"),
+              requestId,
+              action: z.enum(["start", "hit", "finish"]),
+              config: z.unknown().optional(),
+              targetId: z.string().min(1).max(128).optional(),
+            })
+            .strict()
+            .parse(message);
+          if (input.action === "start") {
             if (!previewRound || Date.now() >= previewRound.round.endsAt) {
-              const config = validateMiniConfig('targets',input.config ?? defaultMiniConfig('targets'));
-              previewRound = {config,round:startTargetRound(config)};
+              const config = validateMiniConfig(
+                "targets",
+                input.config ?? defaultMiniConfig("targets"),
+              );
+              previewRound = { config, round: startTargetRound(config) };
             }
           }
-          if (!previewRound) throw new Error('Start the preview round first.');
-          if (input.action === 'hit') previewRound.round = hitTarget(previewRound.round,previewRound.config,input.targetId!);
+          if (!previewRound) throw new Error("Start the preview round first.");
+          if (input.action === "hit")
+            previewRound.round = hitTarget(
+              previewRound.round,
+              previewRound.config,
+              input.targetId!,
+            );
           const ended = Date.now() >= previewRound.round.endsAt;
-          send({type:'targets.result',requestId:rid,award:{id:'preview',type:'targets',status:ended?'played':'pending',config:previewRound.config,targetRound:previewRound.round,serverNow:Date.now(),...(ended?{outcome:targetOutcome(previewRound.round,previewRound.config)}:{})}});
-        } catch (error) { fail('INVALID_TARGET',error instanceof Error ? error.message : 'Invalid target request.',rid); }
+          send({
+            type: "targets.result",
+            requestId: rid,
+            award: {
+              id: "preview",
+              type: "targets",
+              status: ended ? "played" : "pending",
+              config: previewRound.config,
+              targetRound: previewRound.round,
+              serverNow: Date.now(),
+              ...(ended
+                ? {
+                    outcome: targetOutcome(
+                      previewRound.round,
+                      previewRound.config,
+                    ),
+                  }
+                : {}),
+            },
+          });
+        } catch (error) {
+          fail(
+            "INVALID_TARGET",
+            error instanceof Error ? error.message : "Invalid target request.",
+            rid,
+          );
+        }
         return;
       }
       // Standalone URL previews never mutate a player or create an award.
-      if (message.type === 'mini.preview') {
+      if (message.type === "mini.preview") {
         try {
-          const input = z.object({ type: z.literal('mini.preview'), requestId, game: z.enum(['wheel', 'chests', 'targets', 'scratch']), config: z.unknown().optional(), choiceIndex: z.number().int().min(0).max(11).optional() }).strict().parse(message);
-          if (input.game === 'targets') throw new Error('Use targets.preview for a timed round.');
-          const config = validateMiniConfig(input.game, input.config ?? defaultMiniConfig(input.game));
-          send({ type: 'mini.result', requestId: rid, outcome: drawMini(input.game, config, input.choiceIndex) });
-        } catch (error) { fail('INVALID_CONFIG', error instanceof Error ? error.message : 'Invalid preview configuration.', rid); }
+          const input = z
+            .object({
+              type: z.literal("mini.preview"),
+              requestId,
+              game: z.enum(["wheel", "chests", "targets", "scratch"]),
+              config: z.unknown().optional(),
+              choiceIndex: z.number().int().min(0).max(11).optional(),
+            })
+            .strict()
+            .parse(message);
+          if (input.game === "targets")
+            throw new Error("Use targets.preview for a timed round.");
+          const config = validateMiniConfig(
+            input.game,
+            input.config ?? defaultMiniConfig(input.game),
+          );
+          send({
+            type: "mini.result",
+            requestId: rid,
+            outcome: drawMini(input.game, config, input.choiceIndex),
+          });
+        } catch (error) {
+          fail(
+            "INVALID_CONFIG",
+            error instanceof Error
+              ? error.message
+              : "Invalid preview configuration.",
+            rid,
+          );
+        }
         return;
       }
       if (!service)
@@ -158,7 +279,12 @@ export function attachGameSocket(
             credentials.token,
           );
           playerId = opened.player.id;
-          send({ type: "session.ready", requestId: rid, ...opened, awards: (await service.pendingAwards(playerId)).map(visibleAward) });
+          send({
+            type: "session.ready",
+            requestId: rid,
+            ...opened,
+            awards: (await service.pendingAwards(playerId)).map(visibleAward),
+          });
         } else {
           if (!playerId)
             throw new DomainError(
@@ -166,18 +292,74 @@ export function attachGameSocket(
               "SESSION_REQUIRED",
               "Open a player session before spinning.",
             );
-          if (['targets.start','targets.hit','targets.finish'].includes(message.type)) {
-            const input = z.object({type:z.enum(['targets.start','targets.hit','targets.finish']),requestId,awardId:id,targetId:z.string().min(1).max(128).optional()}).strict().parse(message);
-            const action = input.type.split('.')[1] as 'start'|'hit'|'finish';
-            if (action === 'hit' && !input.targetId) throw new DomainError(400,'INVALID_TARGET','Choose a target.');
-            const award = await service.targetAction(playerId,input.awardId,action,input.targetId);
-            send({type:'award.result',requestId:rid,award:visibleAward(award),player:publicPlayer(await service.getPlayer(playerId))});
-          } else if (message.type === 'award.get' || message.type === 'award.play') {
-            const input = z.object({ type: z.enum(['award.get', 'award.play']), requestId, awardId: id, choiceIndex: z.number().int().min(0).max(11).optional() }).strict().parse(message);
-            const award = input.type === 'award.get' ? await service.getAward(playerId, input.awardId) : await service.playAward(playerId, input.awardId, input.choiceIndex);
-            send({ type: 'award.result', requestId: rid, award: visibleAward(award), player: publicPlayer(await service.getPlayer(playerId)) });
+          if (
+            ["targets.start", "targets.hit", "targets.finish"].includes(
+              message.type,
+            )
+          ) {
+            const input = z
+              .object({
+                type: z.enum([
+                  "targets.start",
+                  "targets.hit",
+                  "targets.finish",
+                ]),
+                requestId,
+                awardId: id,
+                targetId: z.string().min(1).max(128).optional(),
+              })
+              .strict()
+              .parse(message);
+            const action = input.type.split(".")[1] as
+              "start" | "hit" | "finish";
+            if (action === "hit" && !input.targetId)
+              throw new DomainError(400, "INVALID_TARGET", "Choose a target.");
+            const award = await service.targetAction(
+              playerId,
+              input.awardId,
+              action,
+              input.targetId,
+            );
+            send({
+              type: "award.result",
+              requestId: rid,
+              award: visibleAward(award),
+              player: publicPlayer(await service.getPlayer(playerId)),
+            });
+          } else if (
+            message.type === "award.get" ||
+            message.type === "award.play"
+          ) {
+            const input = z
+              .object({
+                type: z.enum(["award.get", "award.play"]),
+                requestId,
+                awardId: id,
+                choiceIndex: z.number().int().min(0).max(11).optional(),
+              })
+              .strict()
+              .parse(message);
+            const award =
+              input.type === "award.get"
+                ? await service.getAward(playerId, input.awardId)
+                : await service.playAward(
+                    playerId,
+                    input.awardId,
+                    input.choiceIndex,
+                  );
+            send({
+              type: "award.result",
+              requestId: rid,
+              award: visibleAward(award),
+              player: publicPlayer(await service.getPlayer(playerId)),
+            });
           } else {
-            send({ type: "slot.result", requestId: rid, result: await service.play(playerId, rid), player: publicPlayer(await service.getPlayer(playerId)) });
+            send({
+              type: "slot.result",
+              requestId: rid,
+              result: await service.play(playerId, rid),
+              player: publicPlayer(await service.getPlayer(playerId)),
+            });
           }
         }
       } catch (error) {

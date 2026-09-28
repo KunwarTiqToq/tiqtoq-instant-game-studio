@@ -24,21 +24,21 @@ The `app.json` manifests provide configuration metadata for app creation workflo
 
 In each app's dashboard, open Settings → Reveal Config Vars. Do not upload `.env` files. Do not configure `PORT`: Heroku assigns it.
 
-| App | Config Var | Value |
-| --- | --- | --- |
-| API | `NODE_ENV` | `production` |
-| API | `HOST` | `0.0.0.0` |
-| API | `MONGO_DB_CONNECTION_STRING` | Your MongoDB Atlas / replica-set connection string |
-| API | `MONGO_DB_NAME` | `liveops` (or your demo database name) |
-| API | `BACK_OFFICE_ORIGINS` | Actual back-office HTTPS origin, without a trailing slash; comma-separated if multiple |
-| API | `MONGOMS_DISABLE_POSTINSTALL` | `true` (skips the test-only MongoDB binary download) |
-| Games | `NODE_ENV` | `production` |
-| Games | `HOST` | `0.0.0.0` |
-| Games | `VITE_GAME_WS_URL` | `wss://YOUR-ACTUAL-API-HOST/ws/games` |
-| Back office | `NODE_ENV` | `production` |
-| Back office | `HOST` | `0.0.0.0` |
-| Back office | `VITE_API_URL` | `https://YOUR-ACTUAL-API-HOST/api/back-office` |
-| Back office | `VITE_GAME_URL` | `https://YOUR-ACTUAL-GAMES-HOST` |
+| App         | Config Var                    | Value                                                                                  |
+| ----------- | ----------------------------- | -------------------------------------------------------------------------------------- |
+| API         | `NODE_ENV`                    | `production`                                                                           |
+| API         | `HOST`                        | `0.0.0.0`                                                                              |
+| API         | `MONGO_DB_CONNECTION_STRING`  | Your MongoDB Atlas / replica-set connection string                                     |
+| API         | `MONGO_DB_NAME`               | `liveops` (or your demo database name)                                                 |
+| API         | `BACK_OFFICE_ORIGINS`         | Actual back-office HTTPS origin, without a trailing slash; comma-separated if multiple |
+| API         | `MONGOMS_DISABLE_POSTINSTALL` | `true` (skips the test-only MongoDB binary download)                                   |
+| Games       | `NODE_ENV`                    | `production`                                                                           |
+| Games       | `HOST`                        | `0.0.0.0`                                                                              |
+| Games       | `VITE_GAME_WS_URL`            | `wss://YOUR-ACTUAL-API-HOST/ws/games`                                                  |
+| Back office | `NODE_ENV`                    | `production`                                                                           |
+| Back office | `HOST`                        | `0.0.0.0`                                                                              |
+| Back office | `VITE_API_URL`                | `https://YOUR-ACTUAL-API-HOST/api/back-office`                                         |
+| Back office | `VITE_GAME_URL`               | `https://YOUR-ACTUAL-GAMES-HOST`                                                       |
 
 Allow the Heroku API deployment to reach your database in the MongoDB provider's network settings, and use a database user permitted to create indexes, read/write the demo collections, and apply the existing index migration. A standalone MongoDB instance is not supported because balances and awards use transactions.
 
