@@ -154,8 +154,9 @@ test(
           audience: { ...audience, tags: ["vip"] },
         });
         const before = (await service.getPlayer(player._id)).balance;
-        assert.equal((await service.issueCampaign(c._id)).granted, 1);
-        assert.equal((await service.issueCampaign(c._id)).skipped, 1);
+        const issued = await service.issueCampaign(c._id);
+        assert.equal(issued.granted, 1);
+        assert.equal((await service.issueCampaign(c._id, issued.issuanceId)).granted, 1);
         assert.equal(
           (await service.getPlayer(player._id)).balance,
           before + 25,

@@ -2,6 +2,7 @@ import { MongoClient, type Db } from "mongodb";
 import type {
   Award,
   Campaign,
+  CampaignRun,
   Deposit,
   Player,
   Round,
@@ -11,6 +12,7 @@ export function collections(db: Db) {
   return {
     players: db.collection<Player>("players"),
     campaigns: db.collection<Campaign>("campaigns"),
+    campaignRuns: db.collection<CampaignRun>("campaignRuns"),
     awards: db.collection<Award>("awards"),
     deposits: db.collection<Deposit>("deposits"),
     sessions: db.collection<Session>("sessions"),
@@ -35,13 +37,18 @@ export async function initializeDatabase(client: MongoClient, db: Db) {
     c.awards.createIndex({ requestId: 1 }, { unique: true }),
     c.awards.createIndex({ playerId: 1, status: 1, createdAt: 1 }),
     c.awards.createIndex(
-      { campaignId: 1, playerId: 1 },
+      { campaignId: 1, issuanceId: 1, playerId: 1 },
       {
         unique: true,
-        partialFilterExpression: { campaignId: { $type: "string" } },
+        partialFilterExpression: { issuanceId: { $type: "string" } },
       },
     ),
     c.sessions.createIndex({ playerId: 1, createdAt: 1 }),
     c.campaigns.createIndex({ createdAt: -1 }),
+    c.campaignRuns.createIndex({ campaignId: 1, createdAt: -1 }),
   ]);
+  // Replace the old once-per-campaign constraint after the per-run index exists.
+  // Existing award documents remain unchanged.
+  try { await c.awards.dropIndex('campaignId_1_playerId_1'); }
+  catch (error) { if ((error as {code?:number}).code !== 27) throw error; }
 }

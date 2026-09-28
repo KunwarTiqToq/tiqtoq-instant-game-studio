@@ -34,7 +34,17 @@ export interface Campaign {
   createdAt: Date;
   updatedAt: Date;
 }
+export interface CampaignRun {
+  _id: string;
+  campaignId: string;
+  playerIds: string[];
+  eligible: number;
+  granted: number;
+  skipped: number;
+  createdAt: Date;
+}
 export interface Award {
+  issuanceId?: string;
   _id: string;
   playerId: string;
   campaignId: string | null;

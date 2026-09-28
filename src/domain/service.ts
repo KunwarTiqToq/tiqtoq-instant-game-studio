@@ -38,6 +38,19 @@ export class LiveOpsService extends EventEmitter {
       return result as T;
     });
   }
+  async clearDatabase() {
+    const collections = await this.db.listCollections({}, {nameOnly:false}).toArray();
+    const names = collections.filter((collection) => collection.type === 'collection' && !collection.name.startsWith('system.')).map((collection) => collection.name);
+    const deletedByCollection = await this.transaction(async (session) => {
+      const counts: Record<string,number> = {};
+      for (const name of names) {
+        const result = await this.db.collection(name).deleteMany({}, {session});
+        counts[name] = result.deletedCount;
+      }
+      return counts;
+    });
+    return {database:this.db.databaseName, deletedCount:Object.values(deletedByCollection).reduce((sum,count)=>sum+count,0), collections:deletedByCollection};
+  }
   async getPlayer(playerId: string, session?: ClientSession) {
     const player = await this.c.players.findOne({ _id: playerId }, { session });
     if (!player)
@@ -337,55 +350,49 @@ export class LiveOpsService extends EventEmitter {
     this.emit("awards", input.playerId);
     return award;
   }
-  async issueCampaign(campaignId: string) {
-    const campaign = await this.c.campaigns.findOne({
-      _id: campaignId,
-      status: "active",
-    });
-    if (!campaign)
-      throw new DomainError(
-        409,
-        "CAMPAIGN_INACTIVE",
-        "Activate the campaign before issuing awards.",
-      );
-    const eligible = await this.c.players
-      .find(this.audienceFilter(campaign.audience))
-      .limit(501)
-      .toArray();
-    if (eligible.length > 500)
-      throw new DomainError(
-        400,
-        "AUDIENCE_TOO_LARGE",
-        "Narrow the audience to at most 500 players for this PoC.",
-      );
-    let granted = 0;
-    let skipped = 0;
-    for (const p of eligible) {
-      if (await this.c.awards.findOne({ campaignId, playerId: p._id })) {
-        skipped++;
-        continue;
-      }
-      try {
-        await this.grant(
-          {
-            playerId: p._id,
-            type: campaign.rewardType,
-            value: campaign.rewardValue,
-          gameConfig: campaign.gameConfig,
-            requestId: `campaign:${campaignId}:${p._id}`,
-          },
-          campaignId,
-        );
-        granted++;
-      } catch (error) {
-        if (error instanceof DomainError && error.code === "NOT_ELIGIBLE") {
-          skipped++;
-          continue;
+  async issueCampaign(campaignId: string, issuanceId: string = randomUUID()) {
+    let run;
+    try {
+      run = await this.transaction(async (session) => {
+        const prior = await this.c.campaignRuns.findOne({_id:issuanceId},{session});
+        if (prior) {
+          if (prior.campaignId !== campaignId) throw new DomainError(409,'IDEMPOTENCY_CONFLICT','Issuance ID belongs to another campaign.');
+          return prior;
         }
-        throw error;
-      }
+        const campaign = await this.c.campaigns.findOne({_id:campaignId,status:'active'},{session});
+        if (!campaign) throw new DomainError(409,'CAMPAIGN_INACTIVE','Activate the campaign before issuing awards.');
+        // Every new run matches current persisted data in one consistent snapshot.
+        const eligible = await this.c.players.find(this.audienceFilter(campaign.audience),{session}).limit(501).toArray();
+        if (eligible.length > 500) throw new DomainError(400,'AUDIENCE_TOO_LARGE','Narrow the audience to at most 500 players for this PoC.');
+        const gameConfig = isMiniType(campaign.rewardType)
+          ? validateMiniConfig(campaign.rewardType,campaign.gameConfig ?? defaultMiniConfig(campaign.rewardType)) : undefined;
+        const now = new Date();
+        const awards: Award[] = eligible.map((player) => ({
+          _id:randomUUID(),playerId:player._id,campaignId,issuanceId,
+          type:campaign.rewardType,value:campaign.rewardValue,
+          ...(gameConfig ? {gameConfig} : {}),
+          requestId:`campaign:${issuanceId}:${player._id}`,
+          status:campaign.rewardType === 'credits' ? 'credited' : 'pending',createdAt:now,updatedAt:now,
+        }));
+        if (awards.length) {
+          await this.c.awards.insertMany(awards,{session});
+          if (campaign.rewardType === 'credits') await this.c.players.updateMany(
+            {_id:{$in:eligible.map((player)=>player._id)}},{$inc:{balance:campaign.rewardValue}},{session});
+        }
+        const record = {_id:issuanceId,campaignId,playerIds:eligible.map((player)=>player._id),eligible:eligible.length,granted:awards.length,skipped:0,createdAt:now};
+        await this.c.campaignRuns.insertOne(record,{session});
+        return record;
+      });
+    } catch (error) {
+      // Concurrent retries can race on the run's unique ID. The winning transaction
+      // committed the entire issuance, so returning its result is safe.
+      if ((error as {code?:number}).code !== 11000) throw error;
+      const prior = await this.c.campaignRuns.findOne({_id:issuanceId});
+      if (!prior || prior.campaignId !== campaignId) throw error;
+      run = prior;
     }
-    return { eligible: eligible.length, granted, skipped };
+    for (const playerId of run.playerIds) { this.emit('player',playerId); this.emit('awards',playerId); }
+    return {issuanceId:run._id,eligible:run.eligible,granted:run.granted,skipped:run.skipped};
   }
   async revoke(awardId: string) {
     const award = await this.c.awards.findOneAndUpdate(

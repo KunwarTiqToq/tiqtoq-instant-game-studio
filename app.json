@@ -1,0 +1,38 @@
+{
+  "name": "core-api",
+  "description": "LiveOps demo core-api",
+  "stack": "heroku-24",
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1
+    }
+  },
+  "env": {
+    "NODE_ENV": {
+      "value": "production"
+    },
+    "HOST": {
+      "value": "0.0.0.0"
+    },
+    "MONGO_DB_CONNECTION_STRING": {
+      "description": "MongoDB Atlas or another reachable MongoDB replica-set URI.",
+      "required": true
+    },
+    "MONGO_DB_NAME": {
+      "value": "liveops"
+    },
+    "BACK_OFFICE_ORIGINS": {
+      "description": "Exact HTTPS origin of the back office, without a trailing slash. Comma-separated for multiple origins.",
+      "required": true
+    },
+    "MONGOMS_DISABLE_POSTINSTALL": {
+      "value": "true",
+      "description": "Skip downloading the test-only MongoDB binary during deployment."
+    }
+  }
+}

@@ -12,6 +12,7 @@ import { DomainError, requestId, id } from "../domain/validation.js";
 export function attachGameSocket(
   server: Server,
   service: LiveOpsService | null,
+  heartbeatIntervalMs = 25000,
 ) {
   const wss = new WebSocketServer({
     server,
@@ -21,6 +22,15 @@ export function attachGameSocket(
   wss.on("error", () =>
     console.error("WebSocket server error. Check the configured port."),
   );
+  const awaitingPong = new Set<WebSocket>();
+  const heartbeat = setInterval(() => {
+    for (const socket of wss.clients) {
+      if (awaitingPong.has(socket)) { socket.terminate(); continue; }
+      if (socket.readyState === WebSocket.OPEN) { awaitingPong.add(socket); socket.ping(); }
+    }
+  }, heartbeatIntervalMs);
+  heartbeat.unref();
+  wss.on('close', () => { clearInterval(heartbeat); awaitingPong.clear(); });
   let sweeping = false;
   const sweep = setInterval(async () => {
     if (!service || sweeping) return;
@@ -32,6 +42,8 @@ export function attachGameSocket(
   wss.on('close', () => clearInterval(sweep));
   const visibleAward = (a: Award) => ({ id: a._id, type: a.type, status: a.status, config: a.gameConfig ?? defaultMiniConfig(isMiniType(a.type) ? a.type : 'wheel'), outcome: a.outcome, targetRound: a.targetRound, serverNow: Date.now() });
   wss.on("connection", (socket) => {
+    socket.on('pong', () => awaitingPong.delete(socket));
+    socket.on('close', () => awaitingPong.delete(socket));
     let playerId: string | null = null;
     let busy = false;
     let previewRound: {config: MiniConfig; round: TargetRound} | undefined;

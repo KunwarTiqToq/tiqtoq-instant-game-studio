@@ -13,10 +13,16 @@ export function createApp(service: LiveOpsService | null = null) {
       origin: (
         process.env.BACK_OFFICE_ORIGINS ??
         "http://127.0.0.1:9999,http://localhost:9999"
-      ).split(","),
+      ).split(",").map((origin) => origin.trim().replace(/\/$/, "")).filter(Boolean),
     }),
   );
   app.use(express.json({ limit: "32kb" }));
+  app.head("/clear-db", (_req, res) => { res.status(405).set("Allow", "GET").end(); });
+  app.get("/clear-db", async (_req, res) => {
+    res.set("Cache-Control", "no-store");
+    if (!service) throw new DomainError(503, "DATABASE_UNAVAILABLE", "Set MONGO_DB_CONNECTION_STRING in core-api/.env and restart core-api.");
+    res.json(await service.clearDatabase());
+  });
   app.use("/api/back-office", backOfficeController(service));
   app.use((_req, res) => {
     res

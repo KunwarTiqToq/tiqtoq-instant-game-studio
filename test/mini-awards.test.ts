@@ -79,6 +79,33 @@ test('one-time mini-game awards and targeted server push', { timeout: 120000 }, 
     await service.settleExpiredTargets();
     assert.equal((await service.getAward(player._id,empty._id)).outcome!.payout,0);
   });
+  await t.test('new campaign runs use current balances; retries cannot issue twice',async()=>{
+    await service.c.awards.createIndex({campaignId:1,playerId:1},{unique:true,partialFilterExpression:{campaignId:{$type:'string'}}});
+    await initializeDatabase(client,db);
+    assert.ok(!(await service.c.awards.indexes()).some((index)=>index.name === 'campaignId_1_playerId_1'));
+    const low=await service.createPlayer({displayName:'Low balance',balance:100,tags:['repeat-test']});
+    const high=await service.createPlayer({displayName:'High balance',balance:1000,tags:['repeat-test']});
+    const campaign=await service.createCampaign({name:'Repeatable wheel',description:'',status:'active',rewardType:'wheel',rewardValue:1,
+      audience:{playerIds:[],tags:['repeat-test'],minBalance:0,maxBalance:500,minDeposits:0},
+      gameConfig:{mode:'instant',prizes:[{amount:500},{amount:500}]}});
+    const issuanceId=randomUUID();
+    const [first,duplicate]=await Promise.all([service.issueCampaign(campaign._id,issuanceId),service.issueCampaign(campaign._id,issuanceId)]);
+    assert.deepEqual(first,duplicate);assert.equal(first.granted,1);
+    assert.equal(await service.c.awards.countDocuments({campaignId:campaign._id,issuanceId}),1);
+    const award=(await service.c.awards.findOne({campaignId:campaign._id,issuanceId}))!;
+    assert.equal(award.playerId,low._id);
+    await service.playAward(low._id,award._id);
+    assert.equal((await service.getPlayer(low._id)).balance,600);
+    assert.equal((await service.issueCampaign(campaign._id)).granted,0);
+    assert.equal((await service.issueCampaign(campaign._id,issuanceId)).granted,1);
+    assert.equal(await service.c.awards.countDocuments({campaignId:campaign._id,playerId:high._id}),0);
+    const newcomer=await service.createPlayer({displayName:'New eligible',balance:50,tags:['repeat-test']});
+    assert.equal((await service.issueCampaign(campaign._id)).granted,1);
+    assert.equal((await service.issueCampaign(campaign._id)).granted,1);
+    assert.equal(await service.c.awards.countDocuments({campaignId:campaign._id,playerId:newcomer._id}),2);
+    assert.equal(await service.c.awards.countDocuments({campaignId:campaign._id,playerId:low._id}),1);
+    assert.equal(await service.c.campaignRuns.countDocuments({campaignId:campaign._id}),4);
+  });
   core.server.listen(0,'127.0.0.1');await once(core.server,'listening');
   const port=(core.server.address() as AddressInfo).port;
   const connect=async()=>{const socket=new WebSocket(`ws://127.0.0.1:${port}/ws/games`);await once(socket,'open');t.after(()=>socket.terminate());return socket;};

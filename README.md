@@ -41,7 +41,7 @@ Players with fewer than 1 credit cannot spin. A transaction updates balance/coun
 - `DELETE /players/:id`: archive a player while retaining all history.
 - `POST /targeting/preview`: audience matching with `playerIds`, required `tags`, `minBalance`, `maxBalance`, `minDeposits`. All filters intersect; only active players match.
 - `GET /campaigns`, `POST /campaigns`, `PUT /campaigns/:id`, `DELETE /campaigns/:id`: campaign list / create / full update / archive.
-- `POST /campaigns/:id/issue`: manually issue an active campaign, once per eligible player. At most 500 matching players per request; narrow targeting for larger audiences. Partial progress is persisted; retry skips already-issued awards.
+- `POST /campaigns/:id/issue`: start a new run of an active campaign, re-evaluating current player data. At most 500 matching players per run. Optional `{issuanceId: UUID}` identifies a run; retry with the same ID returns its saved result without additional awards. New runs use new IDs. The run and all awards commit atomically.
 - `GET /awards`, `POST /awards`: list / manual grant (`playerId`, `type`, `value`, `requestId`).
 - `POST /awards/:id/revoke`: revoke a pending mini-game award. Delivered credits are immutable ledger records.
 - `GET /deposits`: list mock deposits.
@@ -74,7 +74,7 @@ Changes to a connected player's name, balance, or status emit `{ type: 'player.u
 
 ## Collections and analytics
 
-Collections: `players`, `sessions`, `deposits`, `campaigns`, `awards`, `gameRounds`. Collections and indexes initialize automatically. Rounds and credit grants serve as immutable records. Deleting players/campaigns means archival, not destructive deletion.
+Collections: `players`, `sessions`, `deposits`, `campaigns`, `campaignRuns`, `awards`, `gameRounds`. Collections and indexes initialize automatically. Rounds and credit grants serve as immutable records. Deleting players/campaigns means archival, not destructive deletion.
 
 Retention uses player creation date as cohort day, distinct players returning on exactly D1 or D7, UTC calendar days, and only completed observation days. Game-player retention excludes simulated sessions; seeded-cohort retention is reported separately. Activity charts include both kinds with simulation counts. The simulator demonstrates measurement, not causal campaign uplift. Analytics currently aggregates collections in application memory and should move to bounded MongoDB aggregations as data grows.
 
@@ -133,3 +133,19 @@ Responses use `award.result` and include `award.targetRound` (`startedAt`, `ends
 Settlement atomically credits the accumulated payout and saves a `total:true` outcome with `hitCount`. Replays return the same result. Hits at or after the deadline add nothing. For multiplier mode, payout is the sum of hit multipliers times `baseAmount`, rather than multiplying the multipliers together.
 
 Database-free previews use `{type:"targets.preview",requestId,action:"start"|"hit"|"finish",config?,targetId?}` on one persistent socket, returning `targets.result` with the same award-shaped state. Configuration is accepted on Start; hit messages cannot change it. Preview state is socket-local and never affects a player balance.
+
+### Repeated campaign issuance
+
+Every new Issue uses a fresh MongoDB transaction snapshot for player balances, tags, status and deposit totals. Previous campaign awards do not disqualify a player; only the current audience rules do. A balance-≤500 campaign includes a player at 100 credits, then excludes that player on a later run after a prize raises their balance above 500. Pending awards can be issued again in later runs if the player still qualifies.
+
+`campaignRuns` records each issuance ID, matched player IDs and result counts. `awards.issuanceId` links awards to their run. Retrying an ID replays its original result, even if player data has since changed; use a new ID to evaluate the audience again. Award pushes occur after the transaction commits. Database initialization creates a per-run/player unique index and removes the old campaign/player unique index without deleting historical awards. Restart core-api to apply this index migration.
+
+## Clear demo records
+
+`GET http://127.0.0.1:5555/clear-db` deletes all documents from all user collections in the configured MongoDB database, including any additional collections beyond the app's built-in ones. Collections and indexes are preserved. The deletes commit together in a transaction. MongoDB system collections and views are not modified.
+
+No parameters or authentication are required. The response contains `database`, total `deletedCount`, and per-collection counts in `collections`. Restart/close active game sessions before clearing if you want the database to remain empty; new application activity can create new records. Previously saved player links reference deleted players after a reset. HEAD requests do not clear data.
+
+## Heroku deployment
+
+See [HEROKU.md](HEROKU.md) for all three apps. Production binds to `0.0.0.0` by default and uses `$PORT`; the game WebSocket shares that port. Keep one API web dyno because live player/award pushes use an in-process event bus.

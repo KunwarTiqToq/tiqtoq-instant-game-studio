@@ -41,6 +41,11 @@ export function backOfficeController(service: LiveOpsService | null) {
         ),
   );
   const s = service!;
+  router.head('/database/clear', (_req,res) => { res.status(405).set('Allow','GET').end(); });
+  router.get('/database/clear', async (_req,res) => {
+    res.set('Cache-Control','no-store');
+    res.json(await s.clearDatabase());
+  });
   const page = (value: unknown) =>
     z.coerce.number().int().min(0).max(100000).default(0).parse(value);
   router.get("/players", async (req, res) =>
@@ -106,9 +111,10 @@ export function backOfficeController(service: LiveOpsService | null) {
       throw new DomainError(404, "CAMPAIGN_NOT_FOUND", "Campaign not found.");
     res.json(c);
   });
-  router.post("/campaigns/:id/issue", async (req, res) =>
-    res.json(await s.issueCampaign(id.parse(req.params.id))),
-  );
+  router.post("/campaigns/:id/issue", async (req, res) => {
+    const {issuanceId} = z.object({issuanceId:id.optional()}).strict().parse(req.body ?? {});
+    res.json(await s.issueCampaign(id.parse(req.params.id),issuanceId));
+  });
   router.get("/awards", async (req, res) =>
     res.json(
       await s.c.awards
