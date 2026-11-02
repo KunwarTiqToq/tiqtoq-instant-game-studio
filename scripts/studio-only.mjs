@@ -6,8 +6,8 @@ const { studioPort } = settings();
 const options = {
   root: studioRoot,
   configFile: resolve(studioRoot, "vite.config.mjs"),
-  server: { port: studioPort, strictPort: true },
-  preview: { port: studioPort, strictPort: true },
+  server: { port: studioPort, strictPort: false },
+  preview: { port: studioPort, strictPort: false },
 };
 const app = process.argv.includes("--preview")
   ? await preview(options)

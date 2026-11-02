@@ -12,7 +12,7 @@ npm run setup
 npm start
 ```
 
-Setup installs locked dependencies for both applications from the single root lockfile. Run it once after downloading, or when the lockfile changes. `npm start` starts the local game server, starts Vite, and opens **http://127.0.0.1:7777/**. Ctrl+C shuts down the services the launcher owns. `npm start -- --no-open` skips opening a browser. An existing compatible game server is reused and is not stopped by the launcher.
+Setup installs locked dependencies for both applications from the single root lockfile. Run it once after downloading, or when the lockfile changes. `npm start` starts the local game server, starts Vite, and opens its available local URL. It starts at **http://127.0.0.1:7777/** and tries 7778, 7779 and onward when a port is busy. Always use the URL printed by the launcher. Ctrl+C shuts down the services the launcher owns. `npm start -- --no-open` skips opening a browser. An existing compatible game server is reused and is not stopped by the launcher.
 
 ## Repository structure
 
@@ -73,3 +73,5 @@ npm test
 Root tests cover both applications, rules, accounting, sessions, retries, transports and workspace compatibility. `npm run dev` runs only the frontend and expects the server separately. `npm run preview` previews the production build and also expects the server separately. No pipeline definitions or Canvas Tester changes are included in this migration.
 
 Original demonstration content only; no affiliation with any lottery operator. Outcomes are illustrative scenario layouts rather than a certified gambling model. Retained upstream Git history and MIT notices acknowledge the foundation; new artwork, game rules and sound have their own documentation.
+
+Changing the studio port creates a separate browser origin, so saved demo sessions and audio preferences from another port are not shared. STUDIO_PORT sets the first port to try, including for frontend development and production preview.

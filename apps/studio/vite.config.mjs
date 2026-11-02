@@ -7,13 +7,13 @@ export default {
   server: {
     host: "127.0.0.1",
     port: Number(process.env.STUDIO_PORT || 7777),
-    strictPort: true,
+    strictPort: false,
     proxy,
   },
   preview: {
     host: "127.0.0.1",
     port: Number(process.env.STUDIO_PORT || 7777),
-    strictPort: true,
+    strictPort: false,
     proxy,
   },
 };

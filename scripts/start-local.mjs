@@ -49,10 +49,11 @@ try {
   frontend = await createServer({
     root: studioRoot,
     configFile: resolve(studioRoot, "vite.config.mjs"),
-    server: { port: studioPort, strictPort: true },
+    server: { port: studioPort, strictPort: false },
   });
   await frontend.listen();
-  const url = `http://127.0.0.1:${studioPort}/`;
+  const url = frontend.resolvedUrls?.local[0];
+  if (!url) throw new Error("The studio did not publish a local URL.");
   console.log(
     `\ntiQtoQ Instant Game Studio\n${url}\nThree games · in-memory credits · no database\nCtrl+C stops the services started by this launcher.\n`,
   );

@@ -9,7 +9,7 @@ The original studio history ends at `4cc7735a424b9a2e36cdbc1bbe5f7ce22e58ed09`; 
 ## Compatibility
 
 - Root commands setup, start, dev, preview, build, test and typecheck remain available. Build and test now validate both applications.
-- The studio still uses port 7777; the server still uses port 5555. Custom ports and starting credits remain configurable.
+- The studio starts at port 7777 and automatically advances to a free port; the server still uses port 5555. Custom ports and starting credits remain configurable.
 - All three /games/<id>/ routes, the older short game routes, query scenarios and seed parameters are unchanged.
 - HTTP endpoints /api/health, /api/catalogue and /api/action, WebSocket /ws/studio, protocol version 1 and the server service identity are unchanged.
 - Sessions and audio preferences use the same browser storage keys. A server restart clears in-memory sessions as before; use Reset demo if an old token has expired.
@@ -33,3 +33,5 @@ If origin already exists, inspect it with `git remote -v` before changing it. If
 ## Verification
 
 Run `npm run setup`, `npm run build`, `npm test` and `npm run format:check` from the root. Use `npm start -- --no-open` for a local smoke check. Server tests cover rules, credit accounting, retries and HTTP/WebSocket transport; frontend tests cover configuration, content and bundled artwork; root tests cover bundled paths, legacy server overrides and port validation.
+
+Changing the studio port creates a separate browser origin, so saved demo sessions and audio preferences from another port are not shared. STUDIO_PORT sets the first port to try, including for frontend development and production preview.
