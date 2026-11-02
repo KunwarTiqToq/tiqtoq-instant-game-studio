@@ -3,7 +3,7 @@
 The studio owns presentation; the game server owns round state and credits. The browser never sends a claimed win, balance or prize amount. It sends a game action and renders the server's response.
 
 ```text
-Browser / PixiJS
+Browser / PixiJS (apps/studio/src/)
   app/lobby.ts             Game selection and resume link
   app/game.ts              Requests, session state and scene orchestration
   games/<id>/theme.json    Per-game art direction, animation and sound configuration
@@ -16,7 +16,7 @@ Browser / PixiJS
           |
           | same-origin /api requests through Vite proxy
           v
-Local game server
+Local game server (apps/server/src/)
   sessions/               Memory store and credentials
   rounds/                 Round lifecycle and one-time settlement
   games/<id>/             Independent rules and server configuration
@@ -35,6 +35,6 @@ Transport requests carry unique IDs. Retrying the same ID with the same body ret
 
 ## Ownership and migration
 
-The two local repositories retain their original Git history and licence notices. The old MongoDB backend, standalone examples, deployment scripts and unused game code were removed at the owner's request. Original remote URLs are retained as `upstream`; no new hosted repository has been created or published. Development dependencies have been pruned to the new runtime.
+One npm workspace repository contains both applications, one root lockfile and shared launchers. The consolidation merge retains both original Git histories and the application MIT notices. Source folders moved without changing gameplay or the protocol. See [consolidation notes](consolidation.md) for provenance and compatibility. The old MongoDB backend and obsolete examples were removed before consolidation.
 
 The server defaults to loopback and accepts local browser origins. This is a demo platform, not production authentication or a real-money service. No deployment, pipeline or Canvas Tester implementation is part of this change.

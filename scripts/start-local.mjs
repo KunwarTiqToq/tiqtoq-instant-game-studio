@@ -1,21 +1,12 @@
 import { existsSync } from "node:fs";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import { once } from "node:events";
 import { spawn } from "node:child_process";
 import { createServer } from "vite";
-const root = fileURLToPath(new URL("..", import.meta.url));
-if (existsSync(resolve(root, ".env")))
-  process.loadEnvFile(resolve(root, ".env"));
-const serverRoot = resolve(
-  process.env.GAME_SERVER_DIR ||
-    resolve(root, "..", "tiqtoq-instant-game-server"),
-);
-const port = Number(process.env.GAME_SERVER_PORT || 5555),
-  studioPort = Number(process.env.STUDIO_PORT || 7777);
-for (const value of [port, studioPort])
-  if (!Number.isInteger(value) || value < 1024 || value > 65535)
-    throw new Error("Ports must be integers between 1024 and 65535.");
+import { studioRoot, loadEnvironment, settings } from "./runtime.mjs";
+loadEnvironment();
+const { serverRoot, port, studioPort } = settings();
 let owned;
 let frontend;
 async function close() {
@@ -46,7 +37,7 @@ try {
     const entry = resolve(serverRoot, "src/server.mjs");
     if (!existsSync(entry))
       throw new Error(
-        `Game server not found at ${serverRoot}. Put both renamed repositories beside each other, or set GAME_SERVER_DIR.`,
+        `Game server not found at ${serverRoot}. Run npm run setup from the repository root, or check GAME_SERVER_DIR.`,
       );
     const { createGameServer } = await import(pathToFileURL(entry).href);
     owned = createGameServer({
@@ -56,8 +47,8 @@ try {
     await once(owned.server, "listening");
   }
   frontend = await createServer({
-    root,
-    configFile: resolve(root, "vite.config.mjs"),
+    root: studioRoot,
+    configFile: resolve(studioRoot, "vite.config.mjs"),
     server: { port: studioPort, strictPort: true },
   });
   await frontend.listen();

@@ -1,0 +1,9 @@
+{
+  "id": "treasure-chances",
+  "name": "Treasure Chances",
+  "cost": 10,
+  "tileCount": 9,
+  "matchPrize": 50,
+  "bonus1": [20, 30, 50, 75, 100],
+  "bonus2": [10, 20, 30, 50, 75, 100]
+}

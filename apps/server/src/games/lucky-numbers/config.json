@@ -1,0 +1,10 @@
+{
+  "id": "lucky-numbers",
+  "name": "Lucky Numbers",
+  "cost": 10,
+  "tileCount": 12,
+  "matchPrize": 15,
+  "winningNumbers": [7, 14, 21],
+  "bonus1": [2, 3, 2, 4, 5],
+  "bonus2": [20, 30, 50, 75, 100, 150]
+}

@@ -2,13 +2,13 @@
 
 ## Server rules
 
-Edit the server's `src/games/<game-id>/config.json` and its `rules.mjs`. The configuration defines round cost, number of tiles, base prize and bonus prize pools. Rules define how layouts are made and which revealed matches unlock bonuses. Restart the server after changes; active in-memory sessions will reset.
+Edit the server's `apps/server/src/games/<game-id>/config.json` and its `rules.mjs`. The configuration defines round cost, number of tiles, base prize and bonus prize pools. Rules define how layouts are made and which revealed matches unlock bonuses. Restart the server after changes; active in-memory sessions will reset.
 
 The current server supports nine chances for Treasure Chances, 9–12 tickets for Lucky Numbers (default 12), and 9–16 positions for Star Quest (default 16). All games have five first-bonus choices and six second-bonus prizes. Changing bonus counts requires updating the corresponding scene layout and validation. Configured costs and prize ranges are shown from the server catalogue in the game UI.
 
 ## Themes and assets
 
-Edit `src/games/<game-id>/theme.json` for the name, subtitle, introduction, colours, title font, bonus names and sound theme. Colours must be six-digit hex values. Original illustrated backgrounds are selected through `presentation.backdrop` and live at `public/games/<game-id>/backdrop-v2.jpg`; shared symbol artwork and open-licensed fonts live under `public/shared/`.
+Edit `apps/studio/src/games/<game-id>/theme.json` for the name, subtitle, introduction, colours, title font, bonus names and sound theme. Colours must be six-digit hex values. Original illustrated backgrounds are selected through `presentation.backdrop` and live at `apps/studio/public/games/<game-id>/backdrop-v2.jpg`; shared symbol artwork and open-licensed fonts live under `apps/studio/public/shared/`.
 
 Sound settings are a root frequency, oscillator waveform, master volume and music tempo. Keep volume between 0 and 1 and the other values inside the validator's bounds. The UI follows reduced-motion preferences automatically.
 

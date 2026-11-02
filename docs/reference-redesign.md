@@ -16,7 +16,7 @@ The other screenshots reinforce the use of distinct themed worlds, compact layou
 
 The canvas is 1100 × 740 logical pixels. Only the environment is a background image. Logos are styled live Pixi Text. Tickets, numbers, symbols, captions, lights, buttons, counters and prize panels are separate interactive/display objects. Stable labels such as Chance 1 and Chest 1 remain available to structural discovery. An image backdrop must never contain the only copy of an essential rule, result or control.
 
-Each game owns its board renderer in `src/games/<id>/board.ts`. Shared cabinet frames, metallic/neon trim, gradient titles, reveal tiles, collectors and circular GO controls live in `src/platform/rendering/cabinet.ts`. The header/footer live in `src/platform/ui/screens/chrome.ts`. Other shared screens handle introductions, bonuses, Info and results.
+Each game owns its board renderer in `apps/studio/src/games/<id>/board.ts`. Shared cabinet frames, metallic/neon trim, gradient titles, reveal tiles, collectors and circular GO controls live in `apps/studio/src/platform/rendering/cabinet.ts`. The header/footer live in `apps/studio/src/platform/ui/screens/chrome.ts`. Other shared screens handle introductions, bonuses, Info and results.
 
 ## Configuration
 
@@ -47,9 +47,9 @@ The references are still images: exact animation sequences, timings and game pro
 
 The backdrops were generated with the built-in image generation tool, then exported as JPEG at quality 88. Each is below 400 KB. Only the selected game's background is loaded. The original generated PNGs remain in the local generated-image library; the game uses the project-local JPEGs below:
 
-- `public/games/treasure-chances/backdrop-v2.jpg`
-- `public/games/lucky-numbers/backdrop-v2.jpg`
-- `public/games/star-quest/backdrop-v2.jpg`
+- `apps/studio/public/games/treasure-chances/backdrop-v2.jpg`
+- `apps/studio/public/games/lucky-numbers/backdrop-v2.jpg`
+- `apps/studio/public/games/star-quest/backdrop-v2.jpg`
 
 ### Prompt set
 

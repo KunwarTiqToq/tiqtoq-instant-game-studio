@@ -1,0 +1,29 @@
+{
+  "name": "@tiqtoq/game-studio",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Three lightweight, original instant-win demonstration games",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "setup": "node ../../scripts/setup.mjs",
+    "start": "node ../../scripts/start-local.mjs",
+    "dev": "node ../../scripts/studio-only.mjs",
+    "build": "tsc --noEmit && vite build",
+    "preview": "node ../../scripts/studio-only.mjs --preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "gsap": "^3.15.0",
+    "pixi.js": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "~6.0.3",
+    "vite": "^7.0.0",
+    "vitest": "^4.1.11"
+  }
+}

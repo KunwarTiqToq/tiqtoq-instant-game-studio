@@ -1,0 +1,20 @@
+{
+  "name": "@tiqtoq/game-server",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Database-free authoritative server for the tiQtoQ instant game demos",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node ../../scripts/server-only.mjs",
+    "dev": "node --watch ../../scripts/server-only.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "build": "node scripts/check.mjs",
+    "check": "npm run build && npm test"
+  },
+  "dependencies": {
+    "ws": "^8.21.3"
+  }
+}

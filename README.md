@@ -4,13 +4,7 @@ Three original, lightweight instant-win demonstrations: **Treasure Chances**, **
 
 ## Start
 
-Use Node.js 24 or newer. Place this repository beside `tiqtoq-instant-game-server`:
-
-```text
-tiQtoQ/
-  tiqtoq-instant-game-studio/
-  tiqtoq-instant-game-server/
-```
+Use Node.js 24 or newer. Both applications are included in this repository.
 
 ```powershell
 cd C:\tiQtoQ\tiqtoq-instant-game-studio
@@ -18,7 +12,22 @@ npm run setup
 npm start
 ```
 
-Setup installs locked dependencies in both repositories. Run it once after downloading, or when lockfiles change. `npm start` starts the local game server, starts Vite, and opens **http://127.0.0.1:7777/**. Ctrl+C shuts down the services the launcher owns. `npm start -- --no-open` skips opening a browser. An existing compatible game server is reused and is not stopped by the launcher.
+Setup installs locked dependencies for both applications from the single root lockfile. Run it once after downloading, or when the lockfile changes. `npm start` starts the local game server, starts Vite, and opens **http://127.0.0.1:7777/**. Ctrl+C shuts down the services the launcher owns. `npm start -- --no-open` skips opening a browser. An existing compatible game server is reused and is not stopped by the launcher.
+
+## Repository structure
+
+```text
+apps/
+  studio/       PixiJS games, artwork, themes and frontend tests
+  server/       Authoritative rules, sessions, credits and server tests
+scripts/        Shared setup, configuration and local launchers
+tests/          Workspace compatibility tests
+docs/           Setup, architecture, game design and server protocol
+package.json    Workspace commands
+package-lock.json  One dependency lockfile
+```
+
+Use `npm run start:server` or `npm run dev:server` for the server alone. `npm run dev` starts the frontend alone. Both read the optional root `.env`. Each application can also be addressed with `npm run <command> --workspace=@tiqtoq/game-studio` or `--workspace=@tiqtoq/game-server`.
 
 ## The games
 
@@ -44,6 +53,8 @@ Use Reset demo before repeating a first-round seed. The browser shares one sessi
 
 ## Documentation
 
+- [Consolidation, compatibility and GitHub handoff](docs/consolidation.md)
+- [Server protocol](docs/server/protocol.md)
 - [Getting started and troubleshooting](docs/getting-started.md)
 - [Architecture and repo structure](docs/architecture.md)
 - [Game configuration](docs/configuration.md)
@@ -59,6 +70,6 @@ npm run build
 npm test
 ```
 
-Run `npm test` in the server repo for rules, accounting, session, retry and transport tests. `npm run dev` runs only the frontend and expects the server separately. `npm run preview` previews the production build and also expects the server separately. No pipeline definitions or Canvas Tester changes are included in this migration.
+Root tests cover both applications, rules, accounting, sessions, retries, transports and workspace compatibility. `npm run dev` runs only the frontend and expects the server separately. `npm run preview` previews the production build and also expects the server separately. No pipeline definitions or Canvas Tester changes are included in this migration.
 
 Original demonstration content only; no affiliation with any lottery operator. Outcomes are illustrative scenario layouts rather than a certified gambling model. Retained upstream Git history and MIT notices acknowledge the foundation; new artwork, game rules and sound have their own documentation.
