@@ -1,0 +1,9 @@
+{
+  "id": "star-quest",
+  "name": "Star Quest",
+  "cost": 10,
+  "tileCount": 16,
+  "matchPrize": 5,
+  "bonus1": [5, 10, 15, 20, 25],
+  "bonus2": [20, 30, 40, 60, 80, 100]
+}
