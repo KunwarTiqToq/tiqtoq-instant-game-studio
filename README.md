@@ -1,114 +1,64 @@
-# Orbit Numbers / games-web
+# tiQtoQ Instant Game Studio
 
-A responsive 3 × 3 slot frontend built with PixiJS v8, TypeScript, and Vite. All game communication with core-api uses the browser's native WebSocket API. No HTTP API calls, polling, or Socket.IO are used.
+Three original, lightweight instant-win demonstrations: **Treasure Chances**, **Lucky Numbers** and **Star Quest**. Click-to-reveal gameplay, two themed bonuses per game, original synthesised sound, optional music, local fonts, information panels and pretend credits. No account, database or cloud service is required.
 
-## Run locally
+## Start
 
-Requires Node.js 24.x and npm 11.x.
+Use Node.js 24 or newer. Place this repository beside `tiqtoq-instant-game-server`:
 
-Start core-api in one terminal:
-
-```sh
-cd ../core-api
-npm install
-npm run dev
+```text
+tiQtoQ/
+  tiqtoq-instant-game-studio/
+  tiqtoq-instant-game-server/
 ```
 
-From games-web in a second terminal:
-
-```sh
-npm install
-npm run dev
+```powershell
+cd C:\tiQtoQ\tiqtoq-instant-game-studio
+npm run setup
+npm start
 ```
 
-Open http://127.0.0.1:7777. Vite hot module replacement is enabled. The server fails if port 7777 is occupied instead of choosing another port.
+Setup installs locked dependencies in both repositories. Run it once after downloading, or when lockfiles change. `npm start` starts the local game server, starts Vite, and opens **http://127.0.0.1:7777/**. Ctrl+C shuts down the services the launcher owns. `npm start -- --no-open` skips opening a browser. An existing compatible game server is reused and is not stopped by the launcher.
 
-The default game connection is `ws://<current hostname>:5555/ws/games` (or `wss` on HTTPS). To override it, copy `.env.example` to `.env` and set `VITE_GAME_WS_URL`, then restart Vite. For remote access, configure core-api's bind address appropriately. Static frontend assets are served over HTTP; game requests and results go exclusively over WebSocket.
+## The games
 
-## Spin flow
+| Game             | Main play                                 | First bonus                           | Second bonus                             |
+| ---------------- | ----------------------------------------- | ------------------------------------- | ---------------------------------------- |
+| Treasure Chances | Reveal nine pictures; three Crowns pay 50 | Three Bells unlock one of five Chests | Three Stars unlock the Fortune Wheel     |
+| Lucky Numbers    | Match 7, 14 or 21; each match pays 15     | Two matches unlock a 2×–5× multiplier | Three matches unlock a Golden Vault      |
+| Star Quest       | Each revealed Star pays 5                 | Three Stars unlock three extra picks  | Six Stars unlock Constellation selection |
 
-1. The button is enabled once PixiJS is ready and the WebSocket is connected.
-2. Clicking starts all three reels immediately and sends `{ "type": "slot.spin", "requestId": "<uuid>" }`.
-3. The frontend accepts only a matching `slot.result` with a valid 3 × 3 numeric matrix and winning positions.
-4. The left reel starts decelerating when the response arrives. The middle and right follow at 280 ms intervals. Each deceleration takes 850 ms and lands precisely on its server-provided column.
-5. All reels must settle before another spin can begin. Winning cells are outlined; the winning-way count and recent session results update.
+Every round costs 10 demo credits. Sessions start with 1,000 credits. Your balance and active round survive refreshing while the server runs. Restarting the server clears all sessions. The in-game Info button explains rules, prize ranges and sound settings. Sound starts muted; enable it with SOUND OFF. Music is independently optional. Preferences are remembered on the same browser origin.
 
-`matrix[row][reel]` matches the core-api protocol. Decorative moving symbols do not determine the result. The server controls every landed symbol and win. Each spin costs 1 mock credit. IDs 0–2 pay 1× per winning way, 3–5 pay 3×, and 6–9 pay 10×. The server deducts the bet and credits the total payout atomically. The game displays the persisted player display name and balance. There are no real-money transactions.
+## Demonstrate a complete journey
 
-A failed request or 8-second timeout cancels animation and restores the last completed board. Connections retry every 2 seconds. Session credentials and unresolved spin IDs are stored locally. A manual retry after a timeout reuses the original request ID, and the backend returns the same saved result without another charge. Session history lives only in the page; rounds and balances persist in MongoDB.
+Use **Show both bonuses** in the lobby, or open:
 
-## Structure
+```text
+http://127.0.0.1:7777/games/treasure-chances/?scenario=double-bonus&seed=7
+http://127.0.0.1:7777/games/lucky-numbers/?scenario=double-bonus&seed=7
+http://127.0.0.1:7777/games/star-quest/?scenario=double-bonus&seed=7
+```
 
-- `src/game/reel-motion.ts`: deterministic reel motion and landing state.
-- `src/game/slot-scene.ts`: PixiJS scene, numeric symbols, masks, and win highlights.
-- `src/network/game-socket.ts`: WebSocket lifecycle, request correlation, validation, and timeout handling.
-- `src/main.ts`: URL routing; `src/slot-app.ts`: slot controls and history.
-- `src/style.css`: responsive page layout.
+Use Reset demo before repeating a first-round seed. The browser shares one session across the games: finish an active round or reset before switching. An interrupted round offers Resume instead of silently charging for another game. The older `/treasure-chances/` route remains an alias. Obsolete slot, wheel-only, target and scratch examples have been removed.
 
-## Verify
+## Documentation
 
-```sh
-npm test
+- [Getting started and troubleshooting](docs/getting-started.md)
+- [Architecture and repo structure](docs/architecture.md)
+- [Game configuration](docs/configuration.md)
+- [Adding another game](docs/creating-a-game.md)
+- [Sound and settings](docs/audio.md)
+- [Asset credits and licences](docs/asset-credits.md)
+- [Reference-inspired canvas design and animation settings](docs/reference-redesign.md)
+
+## Validate
+
+```powershell
 npm run build
-npm run preview
+npm test
 ```
 
-Tests cover continuous rotation while waiting, sequential stops, exact symbols, cancellation, request correlation, concurrent-spin prevention, timeouts, disconnection, reconnection, and response validation.
+Run `npm test` in the server repo for rules, accounting, session, retry and transport tests. `npm run dev` runs only the frontend and expects the server separately. `npm run preview` previews the production build and also expects the server separately. No pipeline definitions or Canvas Tester changes are included in this migration.
 
-## Symbol artwork and win animation
-
-The generated transparent atlas in `public/assets/symbols.png` contains ten symbols in a 5 × 2 grid. IDs 0–9 map to cherries, lemon, grapes, bell, star, diamond, clover, crown, horseshoe, and planet. The server protocol and win evaluation remain unchanged.
-
-PixiJS renders each atlas frame as a sprite. GSAP gently pulses winning sprites (scale and opacity) and their outlines while other symbols dim. The timeline is killed and visual state reset on the next spin, cancellation, or scene destruction. Reduced-motion preferences use static highlights.
-
-## Layout and history
-
-The screen contains the player name/balance, reels, spin button, and history. The entire 1000 × 600 composition scales uniformly to fit the viewport, preserving its 5:3 aspect ratio and side-by-side arrangement; unused space surrounds it when the window has another aspect ratio. History scrolls inside its panel and retains the latest 50 completed spins. Winning entries show the matching symbol triplets, grouped by symbol with their winning-way count.
-
-## Player sessions
-
-core-api requires MongoDB configuration before play. On connection the client sends `session.open`, restoring its stored player ID and token. Without credentials, core-api provisions a demo player with 100 credits. Use the back-office player launch link to play as a specific player. Link credentials are consumed from the fragment and removed from the address bar.
-
-All profile and balance communication remains WebSocket-only. `player.updated` messages reflect mock deposits, credit awards, profile changes, and spins. Back-office requests use HTTP independently. The backend is authoritative for bet, payout, and current balance.
-
-## Lucky wheel and lucky chests
-
-Open these routes on port 7777 (both work without parameters):
-
-- `/lucky-wheel/` — default eight-sector wheel.
-- `/lucky-chests/` — default six chests.
-- `/lucky-wheel/?mode=multiplier&baseAmount=10&amounts=1,2,5,10`
-- `/lucky-chests/?count=4&mode=instant&amounts=5,10,20,50`
-
-Query parameters: `mode` is `instant` (default) or `multiplier`; `amounts` is a comma-separated list; `baseAmount` is required for multipliers. Optional `sectors` (wheel) or `count` (chests) must match the list length when both are supplied. Without amounts, the default prize list repeats to fill the requested count. Optional comma-separated `labels` match the amounts. Alternatively, URL-encode a `config` JSON object with `{mode, baseAmount?, prizes:[{amount,label?}]}`.
-
-Wheel supports 2–16 sectors; chests supports 2–12 chests. Each prize entry has equal probability. Amounts and bases are integer mock credits; amounts may be zero. Each payout is limited to 1,000,000 credits. A chosen chest reveals one randomly selected prize from the configured pool.
-
-Standalone URLs are replayable previews: results come from core-api over WebSocket and never change player balances. The fixed 5:3 stage scales uniformly; GSAP animates wheel deceleration and chest opening, respecting reduced motion.
-
-Campaign/manual awards arrive in `awards.updated` and `session.ready`. The slot opens the next pending bonus after any current spin finishes. Award routes use `?awardId=<id>` and the existing player session. The server snapshots campaign configuration, ignores URL prize overrides, and credits each award exactly once. Refreshing or retrying restores the same settled prize. Continue returns to the slot and opens the next queued award.
-
-## Moving targets and scratch cards
-
-- `/shooting-targets/` — six fast-moving grumpy birds, a 30-second round, and a default per-hit reward range of 5–100 credits.
-- `/shooting-targets/?duration=30&count=6&mode=multiplier&baseAmount=10&min=2&max=8` — a hit awards an integer multiplier from 2 through 8, inclusive.
-- `/scratch-card/` — six scratchable zones; only one can be chosen.
-- `/scratch-card/?amounts=25,3,50,5&modes=instant,multiplier,instant,multiplier&baseAmount=10` — mixed credit and multiplier zones.
-
-Scratch supports 2–12 zones; targets maintains 3–12 live birds (legacy two-bird configurations are upgraded to three). Both support configurable choices and the same preview/award distinction as wheel and chests. Scratch cards accept optional per-zone `mode` in JSON `prizes`, or comma-separated `modes` in the URL. Any multiplier zone requires `baseAmount`.
-
-Drag across a scratch zone to remove its coating. The first touch locks the choice; clearing 30% reveals the result. Keyboard activation and the Reveal this zone button provide an accessible alternative. Remaining zones reveal in gray and pay nothing. Lucky chests now also reveal all unpicked prizes in gray. The server stores the complete shuffled prize layout with the result, preserving it on reconnect/retry. Legacy settled chest awards without a layout reconstruct the remaining pool deterministically.
-
-Grumpy birds move with GSAP (stationary when reduced motion is requested). Click/tap as many birds as possible before the countdown expires. Each shot bird grays out, falls, becomes unclickable, and is replaced immediately. At least three live targets stay visible. Instant rewards add together; multipliers add together and their sum multiplies the base amount once. Reward range is independent of which bird was hit. `min` and `max` define an inclusive uniform integer range; alternatively an explicit `amounts` list provides a discrete prize pool in URL previews. Campaign configuration is authoritative for awarded plays.
-
-Targets accept `duration=5..120` seconds in preview URLs (default 30), or `durationSeconds` in JSON configuration and back-office forms. Press Start to begin. The HUD displays time remaining, hit count, and the accumulated amount/multiplier. The server controls the deadline and each unique target ID. Awarded rounds resume their existing timer after reconnecting; closing the browser does not pause it. A completed round pays the accumulated total exactly once, including zero-hit rounds. Preview rounds use a persistent WebSocket and restarting a disconnected preview creates a new mock round without wallet effects.
-
-## Heroku deployment
-
-See [HEROKU.md](HEROKU.md) for the app setup and required public build-time URLs. `npm start` serves the built `dist` directory with SPA route fallback and Heroku’s assigned port. Development commands and ports are unchanged.
-
-## Code quality
-
-Run `npm run lint` to check JavaScript and TypeScript, or `npm run lint:fix` to apply automatic fixes. Run `npm run format` to format the project with Prettier, and `npm run format:check` to check formatting without changing files. Build output, dependencies, coverage, and local environment files are excluded.
-
-TypeScript is pinned to the 6.0 minor series supported by typescript-eslint. Upgrade them together when newer compiler support is available.
+Original demonstration content only; no affiliation with any lottery operator. Outcomes are illustrative scenario layouts rather than a certified gambling model. Retained upstream Git history and MIT notices acknowledge the foundation; new artwork, game rules and sound have their own documentation.

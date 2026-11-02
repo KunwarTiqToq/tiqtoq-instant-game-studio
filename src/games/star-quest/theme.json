@@ -1,0 +1,32 @@
+{
+  "id": "star-quest",
+  "name": "Star Quest",
+  "eyebrow": "THE COSMIC COLLECTION",
+  "subtitle": "A universe of little discoveries.",
+  "description": "Collect stars across the galaxy. Three grant extra chances; six unlock the Constellation Bonus.",
+  "accent": "#ff8bed",
+  "background": "#090c2c",
+  "panel": "#18215c",
+  "tile": "#47216e",
+  "titleFont": "Orbitron",
+  "bonus1": "Extra Chances",
+  "bonus2": "Constellation Bonus",
+  "sound": {
+    "root": 659.25,
+    "wave": "sine",
+    "volume": 0.45,
+    "musicTempo": 70
+  },
+  "presentation": {
+    "layout": "neon-grid",
+    "columns": 4,
+    "trim": "#4de4ff",
+    "backdrop": "/games/star-quest/backdrop-v2.jpg",
+    "animation": {
+      "revealMs": 260,
+      "bonusMs": 650,
+      "wheelMs": 2300,
+      "particles": 22
+    }
+  }
+}

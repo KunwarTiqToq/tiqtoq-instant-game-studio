@@ -1,0 +1,32 @@
+{
+  "id": "lucky-numbers",
+  "name": "Lucky Numbers",
+  "eyebrow": "THE VAULT COLLECTION",
+  "subtitle": "Your numbers. A golden opportunity.",
+  "description": "Match your numbers to the winning trio. Two matches unlock a multiplier; three open the vault.",
+  "accent": "#ffe398",
+  "background": "#410817",
+  "panel": "#6f1020",
+  "tile": "#9d1724",
+  "titleFont": "Outfit",
+  "bonus1": "Multiplier Cards",
+  "bonus2": "Golden Vaults",
+  "sound": {
+    "root": 523.25,
+    "wave": "triangle",
+    "volume": 0.45,
+    "musicTempo": 94
+  },
+  "presentation": {
+    "layout": "number-stage",
+    "columns": 4,
+    "trim": "#ffc74e",
+    "backdrop": "/games/lucky-numbers/backdrop-v2.jpg",
+    "animation": {
+      "revealMs": 260,
+      "bonusMs": 650,
+      "wheelMs": 2300,
+      "particles": 16
+    }
+  }
+}

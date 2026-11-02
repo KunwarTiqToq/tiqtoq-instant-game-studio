@@ -1,0 +1,32 @@
+{
+  "id": "treasure-chances",
+  "name": "Treasure Chances",
+  "eyebrow": "THE GOLDEN COLLECTION",
+  "subtitle": "Every chance hides a little wonder.",
+  "description": "Uncover royal treasures. Three Bells open the chests; three Stars light the Fortune Wheel.",
+  "accent": "#ffe19a",
+  "background": "#042537",
+  "panel": "#12394d",
+  "tile": "#236075",
+  "titleFont": "Cinzel",
+  "bonus1": "Treasure Chests",
+  "bonus2": "Fortune Wheel",
+  "sound": {
+    "root": 440,
+    "wave": "sine",
+    "volume": 0.5,
+    "musicTempo": 80
+  },
+  "presentation": {
+    "layout": "treasure-board",
+    "columns": 3,
+    "trim": "#f4ce7a",
+    "backdrop": "/games/treasure-chances/backdrop-v2.jpg",
+    "animation": {
+      "revealMs": 260,
+      "bonusMs": 650,
+      "wheelMs": 2300,
+      "particles": 16
+    }
+  }
+}
