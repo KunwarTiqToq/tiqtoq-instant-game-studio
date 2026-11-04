@@ -4,15 +4,14 @@ Three original, lightweight instant-win demonstrations: **Treasure Chances**, **
 
 ## Start
 
-Use Node.js 24 or newer. Both applications are included in this repository.
+Use Node.js 24 or newer. Clone this repository wherever you keep your projects, then open a terminal in the cloned folder. Both applications are included in this repository.
 
 ```powershell
-cd C:\tiQtoQ\tiqtoq-instant-game-studio
 npm run setup
 npm start
 ```
 
-Setup installs locked dependencies for both applications from the single root lockfile. Run it once after downloading, or when the lockfile changes. `npm start` starts the local game server, starts Vite, and opens its available local URL. It starts at **http://127.0.0.1:7777/** and tries 7778, 7779 and onward when a port is busy. Always use the URL printed by the launcher. Ctrl+C shuts down the services the launcher owns. `npm start -- --no-open` skips opening a browser. An existing compatible game server is reused and is not stopped by the launcher.
+Setup installs locked dependencies for both applications from the single root lockfile. Run it once after downloading, or when the lockfile changes. `npm start` starts the local game server, starts Vite, and opens its available local URL. It starts at **http://localhost:7777/** and tries 7778, 7779 and onward when a port is busy. Always use the URL printed by the launcher. Ctrl+C shuts down the services the launcher owns. `npm start -- --no-open` skips opening a browser. An existing compatible game server is reused and is not stopped by the launcher.
 
 ## Repository structure
 
@@ -44,14 +43,16 @@ Every round costs 10 demo credits. Sessions start with 1,000 credits. Your balan
 Use **Show both bonuses** in the lobby, or open:
 
 ```text
-http://127.0.0.1:7777/games/treasure-chances/?scenario=double-bonus&seed=7
-http://127.0.0.1:7777/games/lucky-numbers/?scenario=double-bonus&seed=7
-http://127.0.0.1:7777/games/star-quest/?scenario=double-bonus&seed=7
+http://localhost:7777/games/treasure-chances/?scenario=double-bonus&seed=7
+http://localhost:7777/games/lucky-numbers/?scenario=double-bonus&seed=7
+http://localhost:7777/games/star-quest/?scenario=double-bonus&seed=7
 ```
 
 Use Reset demo before repeating a first-round seed. The browser shares one session across the games: finish an active round or reset before switching. An interrupted round offers Resume instead of silently charging for another game. The older `/treasure-chances/` route remains an alias. Obsolete slot, wheel-only, target and scratch examples have been removed.
 
 ## Documentation
+
+For tiQtoQ Canvas Tester, use the same `npm start` command. The launcher prints a direct project URL for each game using the actual available port. Paste one into a new Canvas Tester project and keep the studio running. In the updated tester UI, set **Local app URL file** to this clone's `.local/studio-url.json` to follow port changes automatically. For repeat CLI or pipeline runs, read that file and pass its `url` to Canvas Tester with `--base-url`. See [Canvas Tester setup](docs/getting-started.md#canvas-tester-projects).
 
 - [Consolidation, compatibility and GitHub handoff](docs/consolidation.md)
 - [Server protocol](docs/server/protocol.md)
@@ -70,7 +71,7 @@ npm run build
 npm test
 ```
 
-Root tests cover both applications, rules, accounting, sessions, retries, transports and workspace compatibility. `npm run dev` runs only the frontend and expects the server separately. `npm run preview` previews the production build and also expects the server separately. No pipeline definitions or Canvas Tester changes are included in this migration.
+Root tests cover both applications, rules, accounting, sessions, retries, transports and workspace compatibility. `npm run dev` runs only the frontend and expects the server separately. `npm run preview` previews the production build and also expects the server separately.
 
 Original demonstration content only; no affiliation with any lottery operator. Outcomes are illustrative scenario layouts rather than a certified gambling model. Retained upstream Git history and MIT notices acknowledge the foundation; new artwork, game rules and sound have their own documentation.
 

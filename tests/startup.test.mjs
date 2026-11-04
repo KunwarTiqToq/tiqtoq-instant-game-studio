@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { createServer } from "node:net";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { root } from "../scripts/runtime.mjs";
 import { createGameServer } from "../apps/server/src/server.mjs";
 
@@ -11,7 +13,7 @@ test(
   { timeout: 30000 },
   async () => {
     const blocker = createServer((socket) => socket.destroy());
-    blocker.listen(0, "127.0.0.1");
+    blocker.listen(0, "localhost");
     await once(blocker, "listening");
     const occupied = blocker.address().port;
     const backend = createGameServer();
@@ -42,7 +44,7 @@ test(
         child.on("error", (error) => (output += error.message));
         let url;
         for (let attempt = 0; attempt < 150; attempt++) {
-          url = output.match(/http:\/\/127\.0\.0\.1:\d+\//)?.[0];
+          url = output.match(/http:\/\/localhost:\d+\//)?.[0];
           if (url) break;
           if (child.exitCode !== null) assert.fail(output);
           await new Promise((resolve) => setTimeout(resolve, 100));
@@ -54,6 +56,24 @@ test(
           "Each live frontend needs its own available port",
         );
         urls.add(url);
+        if (script === "scripts/start-local.mjs") {
+          const published = JSON.parse(
+            await readFile(resolve(root, ".local/studio-url.json"), "utf8"),
+          );
+          assert.equal(published.url, url);
+          assert.equal(published.pid, child.pid);
+          const links =
+            output.match(/http:\/\/localhost:\d+\/games\/[^\s]+/g) || [];
+          assert.equal(links.length, 3, output);
+          for (const link of links) {
+            assert.equal(new URL(link).origin, new URL(url).origin);
+            const game = await fetch(link, {
+              signal: AbortSignal.timeout(3000),
+            });
+            assert.equal(game.status, 200);
+            assert.match(await game.text(), /<html/);
+          }
+        }
         const response = await fetch(url, {
           signal: AbortSignal.timeout(3000),
         });

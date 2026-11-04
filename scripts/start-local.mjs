@@ -1,15 +1,23 @@
 import { existsSync } from "node:fs";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import { once } from "node:events";
 import { spawn } from "node:child_process";
 import { createServer } from "vite";
-import { studioRoot, loadEnvironment, settings } from "./runtime.mjs";
+import { root, studioRoot, loadEnvironment, settings } from "./runtime.mjs";
 loadEnvironment();
 const { serverRoot, port, studioPort } = settings();
 let owned;
 let frontend;
+const urlFile = resolve(root, ".local/studio-url.json");
 async function close() {
+  try {
+    const published = JSON.parse(await readFile(urlFile, "utf8"));
+    if (published.pid === process.pid) await unlink(urlFile);
+  } catch (error) {
+    if (error.code !== "ENOENT") console.error(error.message);
+  }
   await frontend?.close();
   owned?.close();
 }
@@ -54,9 +62,30 @@ try {
   await frontend.listen();
   const url = frontend.resolvedUrls?.local[0];
   if (!url) throw new Error("The studio did not publish a local URL.");
+  await mkdir(resolve(root, ".local"), { recursive: true });
+  const temporaryUrlFile = `${urlFile}.${process.pid}.tmp`;
+  await writeFile(
+    temporaryUrlFile,
+    JSON.stringify({
+      url,
+      pid: process.pid,
+      service: "tiqtoq-instant-game-server",
+      healthPath: "/api/health",
+    }) + "\n",
+  );
+  await rename(temporaryUrlFile, urlFile);
   console.log(
     `\ntiQtoQ Instant Game Studio\n${url}\nThree games · in-memory credits · no database\nCtrl+C stops the services started by this launcher.\n`,
   );
+  console.log(
+    "Canvas Tester project URLs (use these while the studio is running):",
+  );
+  for (const game of ["treasure-chances", "lucky-numbers", "star-quest"])
+    console.log(
+      new URL(`games/${game}/?scenario=double-bonus&seed=7`, url).href,
+    );
+  console.log();
+  console.log("Actual URL for automated tests: .local/studio-url.json\n");
   if (!process.argv.includes("--no-open")) {
     const child =
       process.platform === "win32"
