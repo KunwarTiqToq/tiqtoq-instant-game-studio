@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { once } from "node:events";
 import { spawn } from "node:child_process";
 import { createServer } from "vite";
@@ -10,7 +10,7 @@ loadEnvironment();
 const { serverRoot, port, studioPort } = settings();
 let owned;
 let frontend;
-const urlFile = resolve(root, ".local/studio-url.json");
+const urlFile = resolve(root, process.env.STUDIO_URL_FILE || ".local/studio-url.json");
 async function close() {
   try {
     const published = JSON.parse(await readFile(urlFile, "utf8"));
@@ -62,7 +62,7 @@ try {
   await frontend.listen();
   const url = frontend.resolvedUrls?.local[0];
   if (!url) throw new Error("The studio did not publish a local URL.");
-  await mkdir(resolve(root, ".local"), { recursive: true });
+  await mkdir(dirname(urlFile), { recursive: true });
   const temporaryUrlFile = `${urlFile}.${process.pid}.tmp`;
   await writeFile(
     temporaryUrlFile,
@@ -85,7 +85,7 @@ try {
       new URL(`games/${game}/?scenario=double-bonus&seed=7`, url).href,
     );
   console.log();
-  console.log("Actual URL for automated tests: .local/studio-url.json\n");
+  console.log(`Actual URL for automated tests: ${urlFile}\n`);
   if (!process.argv.includes("--no-open")) {
     const child =
       process.platform === "win32"

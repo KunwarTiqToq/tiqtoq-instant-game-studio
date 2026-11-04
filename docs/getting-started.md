@@ -73,3 +73,5 @@ Every launcher reads the root environment file. Explicit shell variables take pr
 Ctrl+C stops services owned by the combined launcher. A compatible server already running is reused and stays running when that launcher closes. No database cleanup is needed.
 
 Changing the studio port creates a separate browser origin, so saved demo sessions and audio preferences from another port are not shared. STUDIO_PORT sets the first port to try, including for frontend development and production preview.
+
+For isolated CI runs, set `STUDIO_URL_FILE` to a job-owned JSON path. The launcher publishes and removes only its own file; the default remains `.local/studio-url.json`. This allows CI validation alongside an existing local studio without changing that studio’s URL binding.

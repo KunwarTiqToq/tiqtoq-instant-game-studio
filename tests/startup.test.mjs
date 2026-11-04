@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 import { createServer } from "node:net";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { resolve } from "node:path";
+import os from "node:os";
 import { root } from "../scripts/runtime.mjs";
 import { createGameServer } from "../apps/server/src/server.mjs";
 
@@ -19,6 +20,7 @@ test(
     const backend = createGameServer();
     backend.server.listen(0, "127.0.0.1");
     await once(backend.server, "listening");
+    const stateRoot = await mkdtemp(resolve(os.tmpdir(), "studio-startup-"));
     const children = [];
     const urls = new Set();
     try {
@@ -27,10 +29,12 @@ test(
         "scripts/start-local.mjs",
         "scripts/studio-only.mjs",
       ]) {
+        const publishedFile = resolve(stateRoot, `url-${children.length}.json`);
         const child = spawn(process.execPath, [script, "--no-open"], {
           cwd: root,
           env: {
             ...process.env,
+            STUDIO_URL_FILE: publishedFile,
             STUDIO_PORT: String(occupied),
             GAME_SERVER_PORT: String(backend.server.address().port),
           },
@@ -58,7 +62,7 @@ test(
         urls.add(url);
         if (script === "scripts/start-local.mjs") {
           const published = JSON.parse(
-            await readFile(resolve(root, ".local/studio-url.json"), "utf8"),
+            await readFile(publishedFile, "utf8"),
           );
           assert.equal(published.url, url);
           assert.equal(published.pid, child.pid);
@@ -94,6 +98,8 @@ test(
           child.kill();
           await closed;
         }
+      assert.ok(stateRoot.startsWith(resolve(os.tmpdir())));
+      await rm(stateRoot, { recursive: true, force: true });
       backend.close();
       await new Promise((resolve) => blocker.close(resolve));
     }
