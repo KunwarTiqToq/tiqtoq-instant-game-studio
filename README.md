@@ -50,6 +50,8 @@ http://localhost:7777/games/star-quest/?scenario=double-bonus&seed=7
 
 Use Reset demo before repeating a first-round seed. The browser shares one session across the games: finish an active round or reset before switching. An interrupted round offers Resume instead of silently charging for another game. The older `/treasure-chances/` route remains an alias. Obsolete slot, wheel-only, target and scratch examples have been removed.
 
+To show an automated tester finding defects, add `fault=<name>` to a game URL, for example `?scenario=double-bonus&seed=7&fault=wrong-total`. See [Demonstration faults](docs/demonstration-faults.md). Without the parameter the games are unchanged.
+
 ## Documentation
 
 For tiQtoQ Canvas Tester, use the same `npm start` command. The launcher prints a direct project URL for each game using the actual available port. Paste one into a new Canvas Tester project and keep the studio running. In the updated tester UI, set **Local app URL file** to this clone's `.local/studio-url.json` to follow port changes automatically. For repeat CLI or pipeline runs, read that file and pass its `url` to Canvas Tester with `--base-url`. See [Canvas Tester setup](docs/getting-started.md#canvas-tester-projects).
@@ -61,6 +63,7 @@ For tiQtoQ Canvas Tester, use the same `npm start` command. The launcher prints 
 - [Game configuration](docs/configuration.md)
 - [Adding another game](docs/creating-a-game.md)
 - [Sound and settings](docs/audio.md)
+- [Demonstration faults for automated testers](docs/demonstration-faults.md)
 - [Asset credits and licences](docs/asset-credits.md)
 - [Reference-inspired canvas design and animation settings](docs/reference-redesign.md)
 

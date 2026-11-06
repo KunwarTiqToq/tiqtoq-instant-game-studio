@@ -18,8 +18,10 @@ All other messages require sessionId and token:
 | ------------- | ----------------------------------------------------------- |
 | session.state | none                                                        |
 | session.reset | none; reset balance, round number, active round and history |
-| round.start   | `{gameId,scenario,seed}`                                    |
+| round.start   | `{gameId,scenario,seed,faults?}`                            |
 | round.action  | `{roundId,action,index?}`                                   |
+
+`faults` is optional and is for demonstrations only. It is a list of server faults to apply to this one round; the only one is `double-credit`. Any other value is refused as an invalid request. See [Demonstration faults](../demonstration-faults.md).
 
 Actions: `reveal` (zero-based index), `reveal-all`, `continue`, `pick` (zero-based index), `spin`. Continue requires all main reveals or required bonus choices. Star Quest needs three distinct first-bonus picks; the other first bonuses need one. Only Treasure Chances has a wheel spin.
 

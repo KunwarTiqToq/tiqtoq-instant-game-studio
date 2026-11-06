@@ -13,13 +13,23 @@ const rules = {
   "lucky-numbers": numbers,
   "star-quest": stars,
 };
-export function startRound(session, { gameId, scenario = "random", seed = 7 }) {
+/**
+ * Deliberate defects for demonstrating automated testers. Off unless a round
+ * is started with `faults`; a normal player never sends this field.
+ */
+export const SERVER_FAULTS = ["double-credit"];
+export function startRound(
+  session,
+  { gameId, scenario = "random", seed = 7, faults = [] },
+) {
   const config = Object.hasOwn(games, gameId) ? games[gameId] : null;
   if (
     !config ||
     !SCENARIOS.includes(scenario) ||
     !Number.isSafeInteger(seed) ||
-    Math.abs(seed) > 2147483647
+    Math.abs(seed) > 2147483647 ||
+    !Array.isArray(faults) ||
+    !faults.every((fault) => SERVER_FAULTS.includes(fault))
   )
     throw new Error("Invalid game, scenario or seed.");
   if (session.round && session.round.phase !== "result")
@@ -52,6 +62,7 @@ export function startRound(session, { gameId, scenario = "random", seed = 7 }) {
     wheelIndex: Math.floor(random() * 6),
     wheelDone: false,
     collected: false,
+    faults: [...new Set(faults)],
     bonusStep: 0,
     message: "Choose any covered chance to begin.",
   };
@@ -146,6 +157,7 @@ export function actOnRound(session, { roundId, action, index }) {
   if (round.phase === "result" && !round.collected) {
     const total = round.base + round.bonus1 + round.bonus2;
     session.balance += total;
+    if (round.faults?.includes("double-credit")) session.balance += total;
     round.collected = true;
     session.history.unshift({
       gameId: round.gameId,

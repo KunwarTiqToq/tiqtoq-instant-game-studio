@@ -1,5 +1,6 @@
 import type { ScreenContext } from "../screen-context";
 import { Cabinet } from "../../rendering/cabinet";
+import { displayedTotal } from "./results";
 export function renderChrome(ctx: ScreenContext) {
   const { scene, theme, currentRound, audio, busy, render } = ctx,
     c = new Cabinet(ctx),
@@ -75,10 +76,17 @@ export function renderChrome(ctx: ScreenContext) {
 export function renderFooter(ctx: ScreenContext, message: string) {
   const { scene, theme, client, config, currentRound } = ctx;
   scene.panel(16, 673, 1068, 53, "#050918ed", theme.presentation.trim, 7);
+  const round = currentRound();
+  const balance = client.state?.player.balance;
   const items = [
     ["PLAY COST", String(config?.cost || 10)],
-    ["BALANCE", String(client.state?.player.balance ?? "—")],
-    ["TOTAL WIN", String(currentRound()?.total || 0)],
+    [
+      "BALANCE",
+      ctx.faults.has("broken-text") && balance !== undefined
+        ? String(Number(`${balance} credits`))
+        : String(balance ?? "—"),
+    ],
+    ["TOTAL WIN", String(round ? displayedTotal(ctx, round) : 0)],
   ];
   items.forEach(([name, value], i) => {
     scene.text(name, 37 + i * 147, 681, 10, "#c5bfd1");

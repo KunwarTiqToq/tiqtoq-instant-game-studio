@@ -21,6 +21,7 @@ import type { Theme } from "../games/registry";
 import { GameClient, type GameConfig } from "../platform/network/client";
 import { GameAudio, type Cue } from "../platform/audio/audio";
 import { Scene } from "../platform/rendering/scene";
+import { activeFaults, SERVER_FAULTS } from "../platform/faults";
 
 const symbols = [
   "Cherries",
@@ -80,8 +81,13 @@ export async function mountGame(theme: Theme) {
     if (!seedInput.checkValidity() || !seedInput.value) seedInput.value = "7";
     updateUrl();
   };
+  const faults = activeFaults();
   const client = new GameClient();
-  const audio = new GameAudio(theme.sound);
+  const audio = new GameAudio(theme.sound, {
+    ignoreMute: faults.has("mute-ignored"),
+  });
+  if (faults.has("missing-asset"))
+    void Assets.load("/shared/sparkle-glow.png").catch(() => undefined);
   let config: GameConfig | undefined;
   let busy = true;
   let connected = false;
@@ -163,8 +169,25 @@ export async function mountGame(theme: Theme) {
       });
     }
   }
+  /** `no-resume`: the round found on load, which the game then ignores. */
+  let abandonedRoundId: string | undefined;
+  /** `info-hides-progress`: show revealed chances as covered until the next action. */
+  let hideProgress = false;
   function currentRound() {
-    return client.state?.round?.gameId === theme.id ? client.state.round : null;
+    const round =
+      client.state?.round?.gameId === theme.id ? client.state.round : null;
+    return round && round.id === abandonedRoundId ? null : round;
+  }
+  function shownRound() {
+    const round = currentRound();
+    return hideProgress && round?.phase === "reveal"
+      ? {
+          ...round,
+          tiles: round.tiles.map(() => null),
+          progress: 0,
+          secondary: 0,
+        }
+      : round;
   }
   async function sound(cue: Cue) {
     try {
@@ -185,6 +208,7 @@ export async function mountGame(theme: Theme) {
     try {
       await client.send(type, payload);
       connected = true;
+      hideProgress = false;
       const round = currentRound();
       celebrate =
         !!round &&
@@ -198,8 +222,11 @@ export async function mountGame(theme: Theme) {
       )
         audio.play("bonus");
       else if (round && round.base > (previous?.base || 0)) audio.play("match");
-      if (round?.phase === "result" && previous?.phase !== "result")
-        audio.play(round.total ? "win" : "lose");
+      if (round?.phase === "result" && previous?.phase !== "result") {
+        if (faults.has("loss-celebrated")) audio.play("win");
+        else if (!round.total) audio.play("lose");
+        else if (!faults.has("no-win-sound")) audio.play("win");
+      }
       revealIndices =
         round && round.id === previous?.id
           ? round.tiles.flatMap((value, index) =>
@@ -299,6 +326,9 @@ export async function mountGame(theme: Theme) {
         throw new Error("This game is missing from the server catalogue.");
       await client.connect();
       connected = true;
+      const found = currentRound();
+      if (faults.has("no-resume") && found && found.phase !== "result")
+        abandonedRoundId = found.id;
       message = currentRound()?.message || theme.description;
     } catch (error) {
       connected = false;
@@ -355,6 +385,16 @@ export async function mountGame(theme: Theme) {
   }
   function screenContext(): ScreenContext {
     return {
+      faults,
+      startPayload: () => {
+        const server = SERVER_FAULTS.filter((fault) => faults.has(fault));
+        return {
+          gameId: theme.id,
+          scenario: select.value,
+          seed: Number(seedInput.value),
+          ...(server.length ? { faults: server } : {}),
+        };
+      },
       theme,
       config,
       client,
@@ -375,13 +415,15 @@ export async function mountGame(theme: Theme) {
             instructions: "Loading…",
             prizes: "",
           },
-      currentRound,
+      currentRound: shownRound,
       action,
       request,
       button,
       continueAction,
       render,
       setInfo: (value) => {
+        if (info && !value && faults.has("info-hides-progress"))
+          hideProgress = true;
         info = value;
       },
       setMessage: (value) => {
@@ -406,7 +448,12 @@ export async function mountGame(theme: Theme) {
         "#c6c9d8",
         true,
       );
-    } else if (!round && other && other.phase !== "result") {
+    } else if (
+      !round &&
+      other &&
+      other.phase !== "result" &&
+      other.id !== abandonedRoundId
+    ) {
       scene.text(
         "An adventure is already in progress.",
         550,
@@ -428,6 +475,8 @@ export async function mountGame(theme: Theme) {
       );
     } else if (!round) renderIntro(screenContext());
     else if (round.phase === "reveal") renderReveal(screenContext());
+    else if (round.phase === "bonus1" && faults.has("bonus-not-shown"))
+      renderReveal(screenContext());
     else if (round.phase === "bonus1") renderFirstBonus(screenContext());
     else if (round.phase === "bonus2") renderSecondBonus(screenContext());
     else renderResults(screenContext());

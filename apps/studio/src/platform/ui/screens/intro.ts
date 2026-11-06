@@ -10,8 +10,6 @@ export function renderIntro(ctx: ScreenContext) {
     config,
     client,
     copy,
-    select,
-    seedInput,
     request,
     button,
   } = ctx;
@@ -34,16 +32,7 @@ export function renderIntro(ctx: ScreenContext) {
     330,
     437,
     440,
-    () =>
-      void request(
-        "round.start",
-        {
-          gameId: theme.id,
-          scenario: select.value,
-          seed: Number(seedInput.value),
-        },
-        "click",
-      ),
+    () => void request("round.start", ctx.startPayload(), "click"),
     (client.state?.player.balance || 0) >= (config?.cost ?? 10),
     62,
   );

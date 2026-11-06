@@ -15,7 +15,13 @@ export class GameAudio {
   muted = true;
   music = false;
   cues: { cue: string; time: number }[] = [];
-  constructor(private theme: SoundTheme) {
+  /** Deliberate `mute-ignored` defect: muting changes the label only. */
+  private ignoreMute: boolean;
+  constructor(
+    private theme: SoundTheme,
+    options: { ignoreMute?: boolean } = {},
+  ) {
+    this.ignoreMute = options.ignoreMute === true;
     try {
       const saved = JSON.parse(localStorage.getItem("tiqtoq-audio-v1") || "{}");
       this.muted = saved.muted !== false;
@@ -45,7 +51,7 @@ export class GameAudio {
   }
   async toggle() {
     this.muted = !this.muted;
-    if (this.muted) {
+    if (this.muted && !this.ignoreMute) {
       if (this.master && this.context)
         this.master.gain.setValueAtTime(0, this.context.currentTime);
       this.stopMusic();
@@ -93,7 +99,7 @@ export class GameAudio {
     if (
       !this.context ||
       !this.master ||
-      this.muted ||
+      !this.audible() ||
       this.context.state !== "running"
     )
       return;
@@ -116,8 +122,11 @@ export class GameAudio {
       envelope.disconnect();
     };
   }
+  private audible() {
+    return !this.muted || (this.ignoreMute && !!this.context);
+  }
   play(cue: Cue) {
-    if (this.muted || this.context?.state !== "running") return;
+    if (!this.audible() || this.context?.state !== "running") return;
     this.cues.push({ cue, time: this.context.currentTime });
     this.cues = this.cues.slice(-40);
     const notes: Record<Cue, number[]> = {

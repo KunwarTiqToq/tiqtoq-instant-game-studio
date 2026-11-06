@@ -97,6 +97,32 @@ test("all games and scenarios complete with accurate single-credit settlement", 
       }
     }
 });
+test("the double-credit demonstration fault pays twice only when requested", () => {
+  const { send } = fixture();
+  let state = send("round.start", {
+    gameId: "treasure-chances",
+    scenario: "win",
+    seed: 7,
+    faults: ["double-credit"],
+  });
+  const roundId = state.round.id;
+  send("round.action", { roundId, action: "reveal-all" });
+  state = send("round.action", { roundId, action: "continue" });
+  assert.equal(state.round.phase, "result");
+  assert.ok(state.round.total > 0);
+  assert.equal(
+    state.player.balance,
+    1000 - games["treasure-chances"].cost + 2 * state.round.total,
+  );
+  assert.throws(
+    () =>
+      fixture().send("round.start", {
+        gameId: "treasure-chances",
+        faults: ["free-money"],
+      }),
+    /Invalid/,
+  );
+});
 test("seed and choices reproduce the same outcome across independent sessions", () => {
   for (const gameId of Object.keys(games)) {
     const left = complete(fixture().send, gameId),

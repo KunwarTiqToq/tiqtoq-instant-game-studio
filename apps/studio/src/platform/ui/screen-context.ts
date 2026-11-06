@@ -3,7 +3,12 @@ import type { Theme } from "../../games/registry";
 import type { GameClient, GameConfig, Round } from "../network/client";
 import type { Scene } from "../rendering/scene";
 import type { GameAudio, Cue } from "../audio/audio";
+import type { Fault } from "../faults";
 export interface ScreenContext {
+  /** Deliberate defects requested by `?fault=`; empty in normal play. */
+  faults: Set<Fault>;
+  /** The `round.start` payload for the next round. */
+  startPayload: () => Record<string, unknown>;
   theme: Theme;
   config: GameConfig | undefined;
   client: GameClient;

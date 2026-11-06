@@ -60,7 +60,7 @@ export function renderInformation(ctx: ScreenContext) {
     550,
     195,
     () => {
-      ctx.setInfo(false);
+      if (!ctx.faults.has("info-wont-close")) ctx.setInfo(false);
       render();
     },
     !busy,

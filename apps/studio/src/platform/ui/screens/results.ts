@@ -1,5 +1,10 @@
 import type { ScreenContext } from "../screen-context";
 import { Cabinet } from "../../rendering/cabinet";
+import type { Round } from "../../network/client";
+/** The win the player is shown; `wrong-total` drops the second bonus. */
+export function displayedTotal(ctx: ScreenContext, r: Round): number {
+  return ctx.faults.has("wrong-total") ? r.base + r.bonus1 : r.total;
+}
 export function renderResults(ctx: ScreenContext) {
   const {
       theme,
@@ -9,11 +14,10 @@ export function renderResults(ctx: ScreenContext) {
       currentRound,
       button,
       request,
-      select,
-      seedInput,
     } = ctx,
     r = currentRound()!,
-    c = new Cabinet(ctx);
+    c = new Cabinet(ctx),
+    shownTotal = displayedTotal(ctx, r);
   c.frame(63, 156, 974, 427, theme.panel, true);
   scene.text("YOUR ADVENTURE IS COMPLETE", 550, 178, 14, theme.accent, true);
   c.title(
@@ -23,7 +27,7 @@ export function renderResults(ctx: ScreenContext) {
     r.total ? 38 : 30,
     true,
   );
-  c.title(`${r.total} CREDITS`, 550, 280, 69, true);
+  c.title(`${shownTotal} CREDITS`, 550, 280, 69, true);
   [
     ["MAIN GAME", r.base],
     [theme.bonus1.toUpperCase(), r.bonus1],
@@ -46,12 +50,7 @@ export function renderResults(ctx: ScreenContext) {
     320,
     611,
     460,
-    () =>
-      void request("round.start", {
-        gameId: theme.id,
-        scenario: select.value,
-        seed: Number(seedInput.value),
-      }),
+    () => void request("round.start", ctx.startPayload()),
     client.state!.player.balance >= (config?.cost || 10),
     48,
   );
